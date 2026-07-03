@@ -78,6 +78,43 @@
   letter-spacing: 0.03em;
 }
 
+.sources {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  opacity: 0.85;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+  padding-top: 0.4rem;
+}
+
+.sources-title {
+  font-weight: 600;
+}
+
+.sources ol {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.sources code {
+  font-size: 0.75rem;
+}
+
+.rag-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  padding-top: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rag-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
+}
+
 .error {
   color: #c53030;
   padding: 0.5rem 0;

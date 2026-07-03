@@ -21,6 +21,7 @@ function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [useRag, setUseRag] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
@@ -38,10 +39,10 @@ function App() {
     setLoading(true)
 
     try {
-      const reply = await sendChat(next)
+      const { reply, sources } = await sendChat(next, useRag)
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: reply, ts: Date.now() },
+        { role: 'assistant', content: reply, ts: Date.now(), sources },
       ])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -87,12 +88,33 @@ function App() {
           <div key={i} className={`msg msg-${m.role}`}>
             <span className="role">{m.role === 'user' ? 'Вы' : 'DeepSeek'}</span>
             <span className="content">{m.content}</span>
+            {m.sources && m.sources.length > 0 && (
+              <div className="sources">
+                <span className="sources-title">Источники:</span>
+                <ol>
+                  {m.sources.map((s, j) => (
+                    <li key={j}>
+                      <code>{s.file}</code> :: {s.section}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
         ))}
         {loading && <div className="msg msg-assistant">…</div>}
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      <label className="rag-toggle">
+        <input
+          type="checkbox"
+          checked={useRag}
+          onChange={(e) => setUseRag(e.target.checked)}
+        />
+        RAG (поиск по базе знаний)
+      </label>
 
       <div className="composer">
         <input
