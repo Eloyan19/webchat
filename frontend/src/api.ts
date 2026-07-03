@@ -1,23 +1,27 @@
 import type { Message, Source } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
-const MAX_CONTEXT = 20
+const CHAT_TOKEN = import.meta.env.VITE_CHAT_TOKEN ?? ''
+export const MAX_CONTEXT = 20
 
 export interface ChatResult {
   reply: string
   sources: Source[]
 }
 
-export async function sendChat(messages: Message[], useRag: boolean): Promise<ChatResult> {
-  const outgoing = messages.slice(-MAX_CONTEXT)
-  console.log(`[chat] sending ${outgoing.length} messages (history ${messages.length}), useRag=${useRag}`)
+type WireMessage = { role: string; content: string }
+
+function headers(): Record<string, string> {
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (CHAT_TOKEN) h.Authorization = `Bearer ${CHAT_TOKEN}`
+  return h
+}
+
+async function postChat(messages: WireMessage[], useRag: boolean): Promise<ChatResult> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: outgoing.map((m) => ({ role: m.role, content: m.content })),
-      useRag,
-    }),
+    headers: headers(),
+    body: JSON.stringify({ messages, useRag }),
   })
   if (!res.ok) {
     const text = await res.text()
@@ -25,4 +29,36 @@ export async function sendChat(messages: Message[], useRag: boolean): Promise<Ch
   }
   const data = await res.json()
   return { reply: data.reply as string, sources: (data.sources ?? []) as Source[] }
+}
+
+export async function sendChat(
+  messages: Message[],
+  useRag: boolean,
+  summary: string = '',
+): Promise<ChatResult> {
+  const window = messages.slice(-MAX_CONTEXT)
+  const wire: WireMessage[] = window.map((m) => ({ role: m.role, content: m.content }))
+  if (summary) {
+    wire.unshift({
+      role: 'system',
+      content: `Краткое содержание более ранней части диалога:\n${summary}`,
+    })
+  }
+  console.log(
+    `[chat] sending ${wire.length} messages (history ${messages.length}, summary=${summary ? 'yes' : 'no'}, useRag=${useRag})`,
+  )
+  return postChat(wire, useRag)
+}
+
+// Condense the messages that fell out of the takeLast(MAX_CONTEXT) window into a
+// running summary, folding in any previous summary. One deepseek-chat call.
+export async function summarize(previousSummary: string, dropped: Message[]): Promise<string> {
+  const convo = dropped.map((m) => `${m.role}: ${m.content}`).join('\n')
+  const prompt =
+    `Существующее summary диалога:\n${previousSummary || '(пусто)'}\n\n` +
+    `Новые сообщения, которые нужно добавить в summary:\n${convo}\n\n` +
+    `Обнови summary: в 3–6 предложениях сохрани ключевые факты, решения, имена и числа ` +
+    `из всего диалога. Верни только текст summary, без пояснений.`
+  const { reply } = await postChat([{ role: 'user', content: prompt }], false)
+  return reply.trim()
 }
