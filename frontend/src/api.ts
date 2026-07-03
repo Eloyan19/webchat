@@ -1,13 +1,16 @@
 import type { Message } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+const MAX_CONTEXT = 20
 
 export async function sendChat(messages: Message[]): Promise<string> {
+  const outgoing = messages.slice(-MAX_CONTEXT)
+  console.log(`[chat] sending ${outgoing.length} messages (history ${messages.length})`)
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: outgoing.map((m) => ({ role: m.role, content: m.content })),
     }),
   })
   if (!res.ok) {
