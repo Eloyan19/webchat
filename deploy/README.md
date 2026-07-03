@@ -23,7 +23,9 @@ cd frontend && npm run build && cd ..
 sudo mkdir -p /var/www/webchat
 sudo rsync -a --delete frontend/dist/ /var/www/webchat/
 
-# nginx: вставить содержимое deploy/nginx-jorchik.conf в server-блок
+# nginx: rate-limit зона (http-контекст) + location-блок
+sudo cp deploy/nginx-ratelimit.conf /etc/nginx/conf.d/webchat-ratelimit.conf
+# вставить содержимое deploy/nginx-jorchik.conf в server-блок
 # /etc/nginx/sites-available/jorchik.com, затем:
 sudo nginx -t && sudo systemctl reload nginx
 ```
