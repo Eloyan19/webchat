@@ -8,9 +8,32 @@
   box-sizing: border-box;
 }
 
-.chat h1 {
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.chat-header h1 {
   font-size: 1.4rem;
-  margin: 0 0 1rem;
+  margin: 0;
+}
+
+.clear {
+  padding: 0.4rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid rgba(197, 48, 48, 0.5);
+  background: transparent;
+  color: #c53030;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.clear:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .messages {

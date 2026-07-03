@@ -50,6 +50,14 @@ function App() {
     }
   }
 
+  function handleClear() {
+    if (messages.length === 0) return
+    if (!window.confirm('Очистить всю историю чата? Это действие необратимо.')) return
+    setMessages([])
+    setError(null)
+    localStorage.removeItem(STORAGE_KEY)
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -59,7 +67,17 @@ function App() {
 
   return (
     <div className="chat">
-      <h1>Web Chat</h1>
+      <header className="chat-header">
+        <h1>Web Chat</h1>
+        <button
+          type="button"
+          className="clear"
+          onClick={handleClear}
+          disabled={messages.length === 0}
+        >
+          Очистить
+        </button>
+      </header>
 
       <div className="messages">
         {messages.length === 0 && (
