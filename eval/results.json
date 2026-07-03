@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "question": "In Jetchat's ConversationUiState, what does the addMessage(msg) function do — at which position in the list is a new message inserted?",
+    "expectation": "It inserts the new message at the beginning of the list (index 0): _messages.add(0, msg). Comment says 'Add to the beginning of the list'.",
+    "expected_sources": [
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/ConversationUiState.kt"
+    ],
+    "reply_no_rag": "Based on the JetChat architecture and standard patterns in chat applications, the `addMessage(msg)` function in `ConversationUiState` typically inserts new messages **at the end** of the message list (index = `list.size`).\n\nHere's the rationale:\n\n1. **Chronological ordering**: Chat messages are generally displayed in chronological order, with the newest messages appended to the bottom.\n2. **Standard implementation**: Most chat UIs (including JetChat examples) use `MutableList` or `List` operations like `.add()` or `+` operators that append to the end.\n\nThe typical implementation would look something like:\n```kotlin\ndata class ConversationUiState(\n    val messages: List<Message> = emptyList()\n) {\n    fun addMessage(msg: Message): ConversationUiState {\n        return copy(messages = messages + msg)  // Appends to end\n        // or: messages.toMutableList().apply { add(msg) }\n    }\n}\n```\n\n**Exception**: If it's a reverse-chronological chat (newest at top), the insertion might be at position 0, but this is less common in standard chat patterns.\n\nFor the specific JetChat sample project, you'd want to verify by checking the actual implementation in the project source code or documentation.",
+    "reply_rag": "Согласно контексту [3], функция `addMessage(msg)` вставляет новое сообщение в начало списка (`_messages.add(0, msg)` — добавление в начало списка) [3].",
+    "rag_sources": [
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/widget/composables/MessagesWidget.kt",
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/Conversation.kt",
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/ConversationUiState.kt",
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/widget/composables/MessagesWidget.kt",
+      "Jetchat/README.md"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 2,
+    "question": "What constructor parameters does Jetchat's ConversationUiState class take?",
+    "expectation": "channelName: String, channelMembers: Int, initialMessages: List<Message>. Internally keeps a MutableList backed by toMutableStateList().",
+    "expected_sources": [
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/ConversationUiState.kt"
+    ],
+    "reply_no_rag": "Based on the Jetchat sample application from Google, the `ConversationUiState` class constructor takes the following parameters:\n\n```kotlin\ndata class ConversationUiState(\n    val profile: Profile,\n    val messages: List<Message>,\n    val reply: String,\n    val input: String,\n    val isLoading: Boolean,\n    val lastVisible: String?,\n)\n```\n\n**Parameters explained:**\n\n- **`profile: Profile`** - The user profile information (name, avatar, etc.)\n- **`messages: List<Message>`** - The list of chat messages in the conversation\n- **`reply: String`** - The current reply text being composed\n- **`input: String`** - The current input text in the message field\n- **`isLoading: Boolean`** - Whether the conversation is currently loading data\n- **`lastVisible: String?`** - (Nullable) The ID or timestamp of the last visible message, used for pagination/infinite scroll\n\nNote: The exact parameter names and types might vary slightly depending on which version of the Jetchat sample you're looking at, as Google has updated the sample over time. Some versions may also include additional state fields like `isSending` or `error`.",
+    "reply_rag": "Согласно имеющимся в контексте источникам, информация о конструкторе класса `ConversationUiState` отсутствует. В документации лишь упоминается, что `ConversationContent` принимает `ConversationUiState`, который определяет отображаемые данные [1], но конкретные параметры конструктора не описываются.",
+    "rag_sources": [
+      "Jetchat/README.md",
+      "Jetchat/README.md",
+      "Jetchat/app/src/main/java/com/example/compose/jetchat/conversation/Conversation.kt",
+      "Jetchat/README.md",
+      "Jetchat/README.md"
+    ],
+    "retrieval_hit": false
+  },
+  {
+    "id": 3,
+    "question": "Which UI tests are included in the Jetchat androidTest suite, and what does each one cover?",
+    "expectation": "UserInputTest; ConversationTest (UI tests for the Conversation screen, incl. a test for behavior when dark mode changes); NavigationTest (asserts directly on the Navigation Controller / NavController).",
+    "expected_sources": [
+      "Jetchat/README.md"
+    ],
+    "reply_no_rag": "Based on the **Jetchat** sample app (a Jetpack Compose chat application by Google), the `androidTest` suite (typically located under `app/src/androidTest/java/com/example/compose/jetchat/`) includes several UI tests. These tests leverage **Compose UI testing** libraries (`createComposeRule`, `ComposeTestRule`, `semantics`, `onNodeWithText`, etc.).\n\nBelow is a breakdown of the common UI tests found in the Jetchat test suite and what each one covers:\n\n---\n\n### 1. **`ChatScreenTest`** (or often named `ChatTest`)\n**Purpose:** Verifies the core chat conversation UI and user interaction.\n\n**Coverage:**\n- **Message Display:** Checks that sent messages appear in the conversation list using `onNodeWithText(\"Hello\")`.\n- **Send Message:** Clicks the send button, sets text in the input field, and verifies the message appears after sending.\n- **Scroll Behavior:** Ensures the list scrolls to the bottom after a new message is sent.\n- **Empty State:** When no messages exist, checks for a placeholder text (e.g., \"No messages yet\").\n\n---\n\n### 2. **`ChannelsScreenTest`** (or `ChannelListTest`)\n**Purpose:** Tests the channel/direct message list UI.\n\n**Coverage:**\n- **Channel Rendering:** Verifies that channel names (e.g., \"General\", \"Random\") appear correctly using `onNodeWithText(\"General\").assertIsDisplayed()`.\n- **Navigation:** Clicking a channel navigates to the chat screen (checks for a new screen title or back button).\n- **Selection State:** Ensures the currently selected channel is highlighted or shows a different background color.\n- **Direct Message List:** For DM channels, verifies that user avatars or names are present.\n\n---\n\n### 3. **`LoginScreenTest`** (often named `SignInTest` or `LoginTest`)\n**Purpose:** Validates the authentication flow UI.\n\n**Coverage:**\n- **Input Fields:** Checks that username and password fields exist and accept text input.\n- **Button States:** Sign-in button is disabled when fields are empty, enabled when both are filled.\n- **Error Handling:** If an invalid login attempt occurs (or if the UI shows validation), tests for an error message like \"Invalid credentials\".\n- **Successful Login:** After entering valid credentials, verifies navigation to the channel list (usually checks for `onNodeWithText(\"Channels\")`).\n\n---\n\n### 4. **`ConversationDetailTest`** (sometimes merged with ChatScreenTest)\n**Purpose:** Tests the conversation header/participant details.\n\n**Coverage:**\n- **Status Indicator:** Verifies the online/offline indicator dot color for the other user.\n- **User Profile:** Clicks on the user avatar or name in the header, confirming it navigates to a profile screen or opens a bottom sheet.\n- **Typing Indicator:** If the app shows \"User is typing...\", tests that this text appears conditionally.\n\n---\n\n### 5. **`NavigationTest`** (e.g., `JetchatNavigationTest`)\n**Purpose:** Ensures the app’s navigation graph works correctly.\n\n**Coverage:**\n- **Back Navigation:** From chat screen, pressing back returns to channel list.\n- **Deep Links:** If the app uses deep links (e.g., to a specific channel), tests that navigating to the link opens the correct chat.\n- **Bottom Bar (if present):** Verifies that switching tabs (e.g., \"Chats\" vs \"Profile\") changes the visible screen.\n\n---\n\n### 6. **`ThemeTest`** (sometimes `AppThemeTest`)\n**Purpose:** Validates that theming (light/dark mode) applies correctly.\n\n**Coverage:**\n- **Dynamic Color on Android 12+:** Checks that the app uses Material You colors (e.g., the primary color matches the system theme).\n- **Dark Mode:** Toggles dark mode in setup and verifies background colors or text contrast.\n- **Custom Themes:** For devices without dynamic color, checks that fallback theme colors are applied (e.g., blue accent is visible).\n\n---\n\n### 7. **`AccessibilityTest`** (optional, found in some samples)\n**Purpose:** Checks basic accessibility semantics.\n\n**Coverage:**\n- **Content Descriptions:** Every `Image` or `Icon` has a `contentDescription` set.\n- **Clickable Elements:** Buttons have appropriate `onClick` and `role` semantics.\n- **TalkBack Navigation:** Uses `ComposeTestRule` to perform a focus traversal and ensure no nodes are trapped.\n\n---\n\n### Key Testing Patterns in Jetchat:\n- **`createComposeRule()`** – The main test rule for launching a composable.\n- **`semantics { }`** – Used to find UI elements by their roles or properties.\n- **`onNodeWithText(\"...\")`** – Most common matcher for text elements.\n- **`performClick()`** – Simulates user taps.\n- **`performTextInput(\"...\")`** – Types text into `TextField` composables.\n- **`waitForIdle()`** – Ensures compose recompositions and animations finish before assertions.\n\n---\n\n### Example of a typical test (pseudocode):\n```kotlin\n@Test\nfun sendMessage_displaysInChat() {\n    composeTestRule.setContent { JetchatApp() }\n\n    // Navigate to a channel\n    composeTestRule.onNodeWithText(\"General\").performClick()\n\n    // Type and send a message\n    composeTestRule.onNodeWithTag(\"MessageInput\").performTextInput(\"Hello Compose\")\n    composeTestRule.onNodeWithContentDescription(\"Send\").performClick()\n\n    // Verify message appears in the conversation list\n    composeTestRule.onNodeWithText(\"Hello Compose\").assertIsDisplayed()\n}\n```\n\n### Summary Table:\n\n| Test Class | What It Covers |\n|------------|----------------|\n| `ChatScreenTest` | Message send/receive, scroll, empty state |\n| `ChannelsScreenTest` | Channel list display, selection, navigation |\n| `LoginScreenTest` | Input validation, error handling, successful login |\n| `ConversationDetailTest` | User status, profile navigation |\n| `NavigationTest` | Back nav, deep links, tab switching |\n| `ThemeTest` | Light/dark mode, dynamic color application |\n| `AccessibilityTest` | Content descriptions, focus order |",
+    "reply_rag": "В составе набора UI-тестов в `androidTest` для Jetchat входят следующие тесты [1]:\n\n1. **ConversationTest** — тесты для экрана беседы, включая проверку поведения приложения при переключении в тёмный режим [2].\n\n2. **UserInputTest** — проверяет, что пользовательские элементы ввода (включая расширенные элементы управления) работают корректно, в том числе при появлении и скрытии клавиатуры [3].\n\n3. **NavigationTest** — показывает, как писать тесты, напрямую проверяющие навигационный контроллер (`NavController`) [4].",
+    "rag_sources": [
+      "Jetchat/README.md",
+      "Jetchat/README.md",
+      "Jetchat/README.md",
+      "Jetchat/README.md",
+      "Jetchat/README.md"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 4,
+    "question": "In JetNews's HomeViewModel, HomeUiState is a sealed interface. Which three common properties does it declare?",
+    "expectation": "isLoading: Boolean, errorMessages: List<ErrorMessage>, searchInput: String.",
+    "expected_sources": [
+      "JetNews/app/src/main/java/com/example/jetnews/ui/home/HomeViewModel.kt"
+    ],
+    "reply_no_rag": "Based on the JetNews sample app from Android's architecture samples, the `HomeUiState` sealed interface declares these three common properties:\n\n1. **`isLoading: Boolean`** - Indicates whether the data is currently being fetched/loaded\n2. **`isRefreshing: Boolean`** - Indicates whether a manual pull-to-refresh action is in progress\n3. **`errorMessage: String?`** - Holds an optional error message to display when a network or data error occurs\n\nThese properties are common across all the sealed interface implementations (like `Success`, `Error`, `Loading`, etc.) because they represent UI state aspects that exist regardless of which specific state the screen is in.",
+    "reply_rag": "Согласно контексту [1], sealed interface `HomeUiState` в `HomeViewModel` объявляет три общих свойства:\n\n1. **`isLoading: Boolean`**\n2. **`errorMessages: List<ErrorMessage>`**\n3. **`searchInput: String`**\n\nЭти свойства являются обязательными для обеих реализаций интерфейса (`NoPosts` и `HasPosts`) [1].",
+    "rag_sources": [
+      "JetNews/app/src/main/java/com/example/jetnews/ui/home/HomeViewModel.kt",
+      "JetNews/app/src/main/java/com/example/jetnews/ui/home/HomeViewModel.kt",
+      "JetNews/README.md",
+      "JetNews/README.md",
+      "Jetchat/README.md"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 5,
+    "question": "In Jetsnack's JetsnackNavController, what does the upPress() function do, and what annotation is the class marked with?",
+    "expectation": "upPress() calls navController.navigateUp(). The class is annotated @Stable.",
+    "expected_sources": [
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/navigation/JetsnackNavController.kt"
+    ],
+    "reply_no_rag": "Based on the Jetsnack sample app in the Android Developer documentation, here's what the `upPress()` function does and the annotation on `JetsnackNavController`:\n\n**`upPress()` function:**  \nIt handles the \"up\" navigation (back arrow in the top app bar). The function:\n1. Checks if the current screen is the start destination. If so, it calls `activity.finish()` to close the activity.\n2. If not on the start destination, it calls `navigateUp()` on the `NavController` to navigate back to the previous screen in the back stack.\n\n**Annotation:**  \nThe class `JetsnackNavController` is marked with `@Composable`. Since it's a class (not a function), this annotation allows it to be used as a composable receiver or to hold composable state, enabling it to be created/remembered within a composable scope.",
+    "reply_rag": "Из предоставленного контекста [1–5] невозможно определить, что делает функция `upPress()` в `JetsnackNavController` и какими аннотациями помечен сам класс. В контексте есть только определение функции `rememberJetsnackNavController()` [2], но нет описания класса `JetsnackNavController`, его методов или аннотаций. Если у вас есть дополнительные источники, укажите их для поиска ответа.",
+    "rag_sources": [
+      "Jetcaster/core/data/src/main/java/com/example/jetcaster/core/data/Dispatcher.kt",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/navigation/JetsnackNavController.kt",
+      "Jetsnack/README.md",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/home/search/Results.kt",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/home/Home.kt"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 6,
+    "question": "In Jetsnack, what kind of Kotlin declaration is SnackbarManager, and how does it expose its messages?",
+    "expectation": "It is an object (singleton) responsible for managing snackbar messages. It backs a private MutableStateFlow<List<Message>> _messages and exposes it as a read-only StateFlow<List<Message>> via messages; showMessage takes a @StringRes messageTextId.",
+    "expected_sources": [
+      "Jetsnack/app/src/main/java/com/example/jetsnack/model/SnackbarManager.kt"
+    ],
+    "reply_no_rag": "In Jetsnack (the Jetpack Compose sample app), `SnackbarManager` is a **Singleton object** declared as a top-level **Kotlin `object` declaration**.\n\nHere's how it exposes its messages:\n\n## Declaration\n\n```kotlin\nobject SnackbarManager {\n    // ...\n}\n```\n\nIt's a simple Kotlin `object`, which makes it a singleton - there's only one instance throughout the app.\n\n## How it Exposes Messages\n\n`SnackbarManager` uses **`MutableStateFlow`** and **`Compose State`** to expose snackbar messages reactively:\n\n```kotlin\nobject SnackbarManager {\n    private val _snackbarMessage = MutableStateFlow<String?>(null)\n    val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()\n    \n    private val _snackbarMessageState = mutableStateOf<String?>(null)\n    val snackbarMessageState: State<String?> = _snackbarMessageState\n    \n    fun showMessage(message: String) {\n        _snackbarMessage.value = message\n        _snackbarMessageState.value = message\n    }\n    \n    fun clearMessage() {\n        _snackbarMessage.value = null\n        _snackbarMessageState.value = null\n    }\n}\n```\n\n## How it's Consumed in Compose\n\nIn the Composables, the snackbar messages are observed using:\n\n1. **`collectAsState()`** on the StateFlow for reactive observation\n2. **`by remember { SnackbarManager.snackbarMessage }`** to delegate to Compose's `State`\n\nThis allows any Composable to react to snackbar events by simply calling:\n```kotlin\nval message by SnackbarManager.snackbarMessageState\n// or\nval message by SnackbarManager.snackbarMessage.collectAsState()\n```\n\nAnd triggering a snackbar from anywhere:\n```kotlin\nSnackbarManager.showMessage(\"Item added to cart\")\n```\n\nThe pattern uses a **global singleton** with **reactive state** (both Compose `State` and Kotlin `StateFlow`) to decouple snackbar triggering from the UI that displays it.",
+    "reply_rag": "В контексте [2] указано, что `SnackbarManager` — это **объект** (singleton), объявленный как `object SnackbarManager`. Он предоставляет свои сообщения через `StateFlow<List<Message>>`, который объявлен как публичное свойство `val messages: StateFlow<List<Message>>`.",
+    "rag_sources": [
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/components/Snackbar.kt",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/model/SnackbarManager.kt",
+      "Jetsnack/README.md",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/components/Snacks.kt",
+      "Jetsnack/app/src/main/java/com/example/jetsnack/ui/components/Snacks.kt"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 7,
+    "question": "What fields does the ErrorMessage data class in JetNews contain?",
+    "expectation": "id: Long and messageId: Int annotated with @StringRes. i.e. data class ErrorMessage(val id: Long, @StringRes val messageId: Int).",
+    "expected_sources": [
+      "JetNews/app/src/main/java/com/example/jetnews/utils/ErrorMessage.kt"
+    ],
+    "reply_no_rag": "Based on the Android Studio template project for **JetNews** (part of the Now in Android or similar architecture samples), the `ErrorMessage` data class typically contains the following fields:\n\n1.  **`messageId`** (`Int` or `Long`): A unique identifier for the error message, often used for deduplication or tracking in a list.\n2.  **`message`** (`String`): The actual user-facing error string (or a resource ID if it's a raw string placeholder).\n\n**However**, there are two common variations depending on the exact version of the template:\n\n**Variation A (Common in early samples):**\n```kotlin\ndata class ErrorMessage(\n    val messageId: Long,\n    val message: String\n)\n```\n\n**Variation B (Using resource IDs, common in modern architecture samples):**\n```kotlin\ndata class ErrorMessage(\n    val messageId: Long,\n    val message: Int // This is a @StringRes resource ID\n)\n```\n\n**If you are looking at a specific implementation that includes an `errorType` or `data` field** (less common in the base template, but possible in customized versions), it might look like:\n\n```kotlin\ndata class ErrorMessage(\n    val messageId: Long,\n    val message: String,\n    val errorType: ErrorType? = null, // Enum for categorization (e.g., Network, Auth)\n    val data: Any? = null // Additional payload\n)\n```\n\n**In summary:** The core, mandatory fields are **`messageId`** and **`message`** (or a StringRes integer). The exact definition can be found in the `model` package of the JetNews project.",
+    "reply_rag": "Согласно контексту [2], класс `ErrorMessage` содержит два поля:\n- `id: Long`\n- `messageId: Int`",
+    "rag_sources": [
+      "JetNews/README.md",
+      "JetNews/app/src/main/java/com/example/jetnews/utils/ErrorMessage.kt",
+      "JetNews/README.md",
+      "JetNews/README.md",
+      "JetNews/README.md"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 8,
+    "question": "In Reply's ReplyNavigationWrapper composable, how is the navigation layout type decided (what APIs drive it)?",
+    "expectation": "It uses currentWindowAdaptiveInfo() and currentWindowSize() (converted to DpSize) and computes a navLayoutType with a when-expression to pick the adaptive navigation layout based on window size/posture.",
+    "expected_sources": [
+      "Reply/app/src/main/java/com/example/reply/ui/navigation/ReplyNavigationComponents.kt"
+    ],
+    "reply_no_rag": "In Reply's `ReplyNavigationWrapper` composable, the navigation layout type is determined by the **device's window size class** using Material3's adaptive layout APIs. Here are the key APIs that drive the decision:\n\n## Primary Decision APIs\n\n### 1. **WindowSizeClass API**\n```kotlin\nval windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass\n```\nThis returns the current window's size class for both width and height:\n- **Compact** (< 600dp width) → Bottom navigation bar\n- **Medium** (600-840dp width) → Navigation rail\n- **Expanded** (> 840dp width) → Navigation drawer\n\n### 2. **WindowAdaptiveInfo API**\n```kotlin\nval adaptiveInfo = LocalWindowAdaptiveInfo.current\n```\nProvides additional context about the window's display features, such as:\n- Posture (foldable device state)\n- Hinge angle\n- Display cutouts\n\n## Decision Logic Example\n\n```kotlin\n@Composable\nfun ReplyNavigationWrapper(\n    // ...\n) {\n    val windowSizeClass = LocalWindowAdaptiveInfo.current.windowSizeClass\n    \n    // Decision based on width size class\n    when {\n        windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.Compact -> {\n            // Use BottomNavigationBar\n            BottomNavigationBar(...)\n        }\n        windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.Medium -> {\n            // Use NavigationRail\n            NavigationRail(...)\n        }\n        else -> {\n            // Use PermanentNavigationDrawer\n            PermanentNavigationDrawer(...)\n        }\n    }\n}\n```\n\n## Underlying Dependencies\n\n- **`androidx.compose.material3.adaptive`** library (for `WindowSizeClass`)\n- **`currentWindowAdaptiveInfo()`** composable function\n- **`WindowWidthSizeClass`** and **`WindowHeightSizeClass`** enums\n\nThe system automatically recalculates when the window size changes (screen rotation, resizing in multi-window mode, foldable state changes), triggering recomposition with the appropriate navigation layout.",
+    "reply_rag": "Исходя из предоставленного контекста, в файле [3] (README.md) описано, как выбор типа навигации зависит от размера экрана и состояния устройства:\n\n*   **`BottomNavigationBar`** используется для компактных устройств (compact devices) [3].\n*   **`NavigationRail`** используется для устройств среднего размера (medium size devices) [3].\n*   **`PermanentNavigationDrawer`** используется для больших устройств или десктопов [3].\n\nТакже в контексте упоминается, что в зависимости от разных размеров и состояний устройства **правильный тип навигации выбирается динамически** [3].\n\nОднако, сам код, отвечающий за принятие решения о том, какой именно навигационный компонент использовать (например, условная логика `if (sizeClass == Compact) { ... } else if ...`), в предоставленных фрагментах кода **отсутствует**. Чтобы узнать, какие именно API (например, `WindowSizeClass` или `BoxWithConstraints`) используются для этого динамического выбора, необходимо обратиться к файлу `ReplyApp.kt` (строка 71, на которую есть ссылка в контексте [3]), который не был предоставлен в полном объеме.",
+    "rag_sources": [
+      "Reply/app/src/main/java/com/example/reply/ui/ReplyApp.kt",
+      "Reply/app/src/main/java/com/example/reply/ui/navigation/ReplyNavigationComponents.kt",
+      "Reply/README.md",
+      "Reply/app/src/main/java/com/example/reply/ui/navigation/ReplyNavigationComponents.kt",
+      "Reply/app/src/main/java/com/example/reply/ui/navigation/ReplyNavigationActions.kt"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 9,
+    "question": "What are the three main screens/components of the Jetcaster phone app?",
+    "expectation": "The home screen, the podcast details screen, and the player screen.",
+    "expected_sources": [
+      "Jetcaster/README.md"
+    ],
+    "reply_no_rag": "Based on the standard architecture and official design guidelines for the **Jetcaster** sample app (a Jetpack Compose-based podcast player), the three main screens/components are:\n\n1.  **Home Screen (Discover/For You):**  \n    This is the primary landing screen. It displays a curated list of podcast categories (e.g., \"Technology,\" \"Science\") and a \"For You\" section of recommended episodes. It often features a **CategoryChip** filter row and a horizontally scrolling list of **PodcastCard** components.\n\n2.  **Podcast Detail Screen (Podcast Screen):**  \n    When a user taps a podcast from the Home screen, they are taken here. It shows the podcast's artwork, title, publisher, and description. The key component is the **EpisodesList**, which displays all available episodes with play buttons, durations, and publish dates.\n\n3.  **Player Screen (Now Playing / Mini Player + Full Player):**  \n    This is a two-part component in Jetcaster:\n    - **Mini Player:** A persistent bar at the bottom of the screen showing the currently playing episode's title and a play/pause button.\n    - **Full Player:** An expandable sheet (or full-screen view) that includes a progress slider, playback controls (play, pause, skip forward/backward), and a **PlayerSpeedSelector** for playback speed adjustments.\n\n*(Note: In some versions of Jetcaster, a **Search** screen is also prominent, but the core \"three screens\" as defined by the app’s navigation graph typically center on **Home**, **Podcast Detail**, and **Player**.)*",
+    "reply_rag": "According to the documentation [1], the Jetcaster phone app has three main screens/components:\n\n- **Home screen**\n- **Podcast details screen**\n- **Player screen**",
+    "rag_sources": [
+      "Jetcaster/README.md",
+      "Jetcaster/README.md",
+      "README.md",
+      "Jetcaster/README.md",
+      "Jetcaster/README.md"
+    ],
+    "retrieval_hit": true
+  },
+  {
+    "id": 10,
+    "question": "What copyright year is stated in the top-level (root) README license header of the Jetpack Compose Samples repository?",
+    "expectation": "2024 ('Copyright 2024 The Android Open Source Project') in the root README — note individual samples like Jetchat/Jetsnack state 2020, so the root differs.",
+    "expected_sources": [
+      "README.md"
+    ],
+    "reply_no_rag": "Based on the Jetpack Compose Samples repository's root README file, the copyright year stated in the license header is **2022**.\n\nThe header reads:\n```\nCopyright 2022 The Android Open Source Project\n```",
+    "reply_rag": "В верхнем (корневом) README-файле репозитория Jetpack Compose Samples указан год копирайта **2024** [1].",
+    "rag_sources": [
+      "README.md",
+      "JetLagged/README.md",
+      "Jetsnack/README.md",
+      "Jetchat/README.md",
+      "README.md"
+    ],
+    "retrieval_hit": true
+  }
+]
