@@ -12,7 +12,15 @@ load_dotenv()
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 DEEPSEEK_MODEL = "deepseek-chat"
 RAG_URL = os.getenv("RAG_URL", "http://127.0.0.1:8100")
-RAG_K = 5
+
+# Plain RAG: single-stage retrieval, no filter.
+RAG_K = int(os.getenv("RAG_K", "5"))
+# Improved RAG: retrieve more (k_before), filter by cosine threshold, keep k_after.
+RAG_K_BEFORE = int(os.getenv("RAG_K_BEFORE", "20"))
+RAG_K_AFTER = int(os.getenv("RAG_K_AFTER", "5"))
+# Cosine-similarity cutoff for the relevance filter (calibrated on this corpus:
+# in-domain chunks score ~0.66-0.73, off-topic ~0.5-0.59).
+RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.62"))
 
 app = FastAPI()
 
@@ -32,6 +40,7 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[Message]
     useRag: bool = False
+    improvedRag: bool = False
 
 
 class Source(BaseModel):
@@ -45,27 +54,60 @@ def health():
     return {"ok": True}
 
 
-async def fetch_rag_context(query: str) -> tuple[str | None, list[Source]]:
-    """Query the RAG service. Returns (system_prompt, sources).
+async def call_deepseek(messages: list[dict], api_key: str) -> str:
+    """Single DeepSeek chat completion. Raises httpx errors / KeyError on failure."""
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            DEEPSEEK_API_URL,
+            json={"model": DEEPSEEK_MODEL, "messages": messages},
+            headers={"Authorization": f"Bearer {api_key}"},
+        )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
 
-    On any failure returns (None, []) so /chat degrades gracefully to a
-    plain DeepSeek call instead of erroring out.
-    """
+
+async def rewrite_query(messages: list[dict], last_user: str, api_key: str) -> str:
+    """Rewrite the last question into a standalone retrieval query using dialog
+    context (resolve pronouns/references). Falls back to last_user on any error."""
+    convo = "\n".join(f"{m['role']}: {m['content']}" for m in messages[-6:])
+    rewrite_msgs = [
+        {
+            "role": "system",
+            "content": (
+                "Ты переписываешь вопрос пользователя в ОДИН самостоятельный поисковый "
+                "запрос для базы знаний по исходному коду (Google compose-samples). "
+                "Раскрывай местоимения и отсылки к прошлым репликам, добавляй ключевые "
+                "термины. Верни ТОЛЬКО запрос — без кавычек, без пояснений."
+            ),
+        },
+        {
+            "role": "user",
+            "content": f"Диалог:\n{convo}\n\nПерепиши последний вопрос в поисковый запрос.",
+        },
+    ]
+    try:
+        rewritten = (await call_deepseek(rewrite_msgs, api_key)).strip()
+        return rewritten or last_user
+    except (httpx.HTTPError, KeyError, ValueError):
+        return last_user
+
+
+async def rag_search(query: str, k: int, rerank: bool) -> list[dict]:
+    """Call the RAG /search service. Returns chunks, or [] on any failure."""
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 f"{RAG_URL}/search",
-                json={"query": query, "k": RAG_K, "strategy": "structural"},
+                json={"query": query, "k": k, "strategy": "structural", "rerank": rerank},
             )
         resp.raise_for_status()
         data = resp.json()
-        chunks = data.get("chunks", []) if isinstance(data, dict) else []
+        return data.get("chunks", []) if isinstance(data, dict) else []
     except (httpx.HTTPError, ValueError):
-        return None, []
+        return []
 
-    if not chunks:
-        return None, []
 
+def build_context(chunks: list[dict]) -> tuple[str, list[Source]]:
     blocks = []
     sources: list[Source] = []
     for i, c in enumerate(chunks, start=1):
@@ -74,7 +116,6 @@ async def fetch_rag_context(query: str) -> tuple[str | None, list[Source]]:
         text = c.get("text", "")
         blocks.append(f"[{i}] {file} :: {section}\n{text}")
         sources.append(Source(file=file, section=section, score=c.get("score", 0.0)))
-
     context = "\n\n".join(blocks)
     system_prompt = (
         "Ты отвечаешь на вопрос пользователя, опираясь ТОЛЬКО на приведённый ниже "
@@ -86,6 +127,38 @@ async def fetch_rag_context(query: str) -> tuple[str | None, list[Source]]:
     return system_prompt, sources
 
 
+async def fetch_rag_context(
+    query: str, improved: bool
+) -> tuple[str | None, list[Source], dict]:
+    """Retrieve context for `query`.
+
+    Plain mode: single-stage top-RAG_K, no filter.
+    Improved mode: retrieve RAG_K_BEFORE (asking the service to rerank), drop
+    chunks below RAG_SIMILARITY_THRESHOLD, keep top RAG_K_AFTER.
+
+    Returns (system_prompt|None, sources, meta). None system_prompt -> answer
+    without RAG context (graceful degradation).
+    """
+    k = RAG_K_BEFORE if improved else RAG_K
+    chunks = await rag_search(query, k, rerank=improved)
+    meta = {"k_requested": k, "k_returned": len(chunks), "improved": improved}
+
+    if improved:
+        kept = [c for c in chunks if c.get("score", 0.0) >= RAG_SIMILARITY_THRESHOLD]
+        kept = kept[:RAG_K_AFTER]
+        meta.update(
+            {"threshold": RAG_SIMILARITY_THRESHOLD, "k_after_filter": len(kept),
+             "filtered_out": len(chunks) - len(kept)}
+        )
+        chunks = kept
+
+    if not chunks:
+        return None, [], meta
+
+    system_prompt, sources = build_context(chunks)
+    return system_prompt, sources, meta
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -94,28 +167,34 @@ async def chat(req: ChatRequest):
 
     messages = [m.model_dump() for m in req.messages]
     sources: list[Source] = []
+    rewritten_query: str | None = None
+    rag_meta: dict = {}
 
     if req.useRag:
         last_user = next(
             (m["content"] for m in reversed(messages) if m["role"] == "user"), None
         )
         if last_user:
-            system_prompt, sources = await fetch_rag_context(last_user)
+            search_query = last_user
+            if req.improvedRag:
+                search_query = await rewrite_query(messages, last_user, api_key)
+                rewritten_query = search_query
+            system_prompt, sources, rag_meta = await fetch_rag_context(
+                search_query, req.improvedRag
+            )
             if system_prompt:
                 messages = [{"role": "system", "content": system_prompt}, *messages]
 
-    payload = {"model": DEEPSEEK_MODEL, "messages": messages}
-    headers = {"Authorization": f"Bearer {api_key}"}
-
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(DEEPSEEK_API_URL, json=payload, headers=headers)
+        reply = await call_deepseek(messages, api_key)
     except httpx.HTTPError as e:
         return JSONResponse(status_code=502, content={"error": f"DeepSeek request failed: {e}"})
+    except (KeyError, ValueError) as e:
+        return JSONResponse(status_code=502, content={"error": f"Bad DeepSeek response: {e}"})
 
-    if resp.status_code != 200:
-        return JSONResponse(status_code=502, content={"error": resp.text})
-
-    data = resp.json()
-    reply = data["choices"][0]["message"]["content"]
-    return {"reply": reply, "sources": [s.model_dump() for s in sources]}
+    return {
+        "reply": reply,
+        "sources": [s.model_dump() for s in sources],
+        "rewrittenQuery": rewritten_query,
+        "ragMeta": rag_meta,
+    }

@@ -115,6 +115,19 @@
   cursor: pointer;
 }
 
+.rag-toggle-nested {
+  padding-top: 0.4rem;
+  padding-left: 1.6rem;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.rewritten {
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  opacity: 0.8;
+}
+
 .error {
   color: #c53030;
   padding: 0.5rem 0;

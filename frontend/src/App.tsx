@@ -30,6 +30,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [useRag, setUseRag] = useState(false)
+  const [improvedRag, setImprovedRag] = useState(false)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
@@ -70,10 +71,15 @@ function App() {
         }
       }
 
-      const { reply, sources } = await sendChat(next, useRag, curSummary)
+      const { reply, sources, rewrittenQuery } = await sendChat(
+        next,
+        useRag,
+        useRag && improvedRag,
+        curSummary,
+      )
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: reply, ts: Date.now(), sources },
+        { role: 'assistant', content: reply, ts: Date.now(), sources, rewrittenQuery },
       ])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -123,6 +129,11 @@ function App() {
           <div key={i} className={`msg msg-${m.role}`}>
             <span className="role">{m.role === 'user' ? 'Вы' : 'DeepSeek'}</span>
             <span className="content">{m.content}</span>
+            {m.rewrittenQuery && (
+              <div className="rewritten">
+                🔎 поисковый запрос: <em>{m.rewrittenQuery}</em>
+              </div>
+            )}
             {m.sources && m.sources.length > 0 && (
               <div className="sources">
                 <span className="sources-title">Источники:</span>
@@ -150,6 +161,17 @@ function App() {
         />
         RAG (поиск по базе знаний)
       </label>
+
+      {useRag && (
+        <label className="rag-toggle rag-toggle-nested">
+          <input
+            type="checkbox"
+            checked={improvedRag}
+            onChange={(e) => setImprovedRag(e.target.checked)}
+          />
+          Улучшенный RAG (query rewrite + фильтр/реранк)
+        </label>
+      )}
 
       <div className="composer">
         <input

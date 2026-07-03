@@ -11,4 +11,5 @@ export interface Message {
   content: string
   ts: number
   sources?: Source[]
+  rewrittenQuery?: string | null
 }

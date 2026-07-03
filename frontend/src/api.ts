@@ -7,6 +7,7 @@ export const MAX_CONTEXT = 20
 export interface ChatResult {
   reply: string
   sources: Source[]
+  rewrittenQuery: string | null
 }
 
 type WireMessage = { role: string; content: string }
@@ -17,23 +18,32 @@ function headers(): Record<string, string> {
   return h
 }
 
-async function postChat(messages: WireMessage[], useRag: boolean): Promise<ChatResult> {
+async function postChat(
+  messages: WireMessage[],
+  useRag: boolean,
+  improvedRag: boolean,
+): Promise<ChatResult> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ messages, useRag }),
+    body: JSON.stringify({ messages, useRag, improvedRag }),
   })
   if (!res.ok) {
     const text = await res.text()
     throw new Error(`Backend error ${res.status}: ${text}`)
   }
   const data = await res.json()
-  return { reply: data.reply as string, sources: (data.sources ?? []) as Source[] }
+  return {
+    reply: data.reply as string,
+    sources: (data.sources ?? []) as Source[],
+    rewrittenQuery: (data.rewrittenQuery ?? null) as string | null,
+  }
 }
 
 export async function sendChat(
   messages: Message[],
   useRag: boolean,
+  improvedRag: boolean = false,
   summary: string = '',
 ): Promise<ChatResult> {
   const window = messages.slice(-MAX_CONTEXT)
@@ -45,9 +55,9 @@ export async function sendChat(
     })
   }
   console.log(
-    `[chat] sending ${wire.length} messages (history ${messages.length}, summary=${summary ? 'yes' : 'no'}, useRag=${useRag})`,
+    `[chat] sending ${wire.length} messages (history ${messages.length}, summary=${summary ? 'yes' : 'no'}, useRag=${useRag}, improvedRag=${improvedRag})`,
   )
-  return postChat(wire, useRag)
+  return postChat(wire, useRag, improvedRag)
 }
 
 // Condense the messages that fell out of the takeLast(MAX_CONTEXT) window into a
@@ -59,6 +69,6 @@ export async function summarize(previousSummary: string, dropped: Message[]): Pr
     `Новые сообщения, которые нужно добавить в summary:\n${convo}\n\n` +
     `Обнови summary: в 3–6 предложениях сохрани ключевые факты, решения, имена и числа ` +
     `из всего диалога. Верни только текст summary, без пояснений.`
-  const { reply } = await postChat([{ role: 'user', content: prompt }], false)
+  const { reply } = await postChat([{ role: 'user', content: prompt }], false, false)
   return reply.trim()
 }
