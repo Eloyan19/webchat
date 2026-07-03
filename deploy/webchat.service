@@ -1,0 +1,16 @@
+[Unit]
+Description=Web Chat backend (FastAPI /chat proxy to DeepSeek + RAG)
+After=network.target rag-search.service
+Wants=rag-search.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/repos/webchat/backend
+EnvironmentFile=/root/repos/webchat/backend/.env
+Environment=RAG_URL=http://127.0.0.1:8100
+ExecStart=/root/repos/webchat/backend/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
