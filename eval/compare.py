@@ -25,9 +25,9 @@ CHAT_TOKEN = os.getenv("CHAT_TOKEN", "")
 HERE = Path(__file__).parent
 
 
-def ask(question: str, use_rag: bool, improved: bool) -> dict:
+def ask(messages: list[dict], use_rag: bool, improved: bool) -> dict:
     body = json.dumps({
-        "messages": [{"role": "user", "content": question}],
+        "messages": messages,
         "useRag": use_rag, "improvedRag": improved,
     }).encode()
     headers = {"Content-Type": "application/json"}
@@ -47,10 +47,12 @@ def main() -> None:
     questions = json.loads((HERE / "questions.json").read_text())
     results = []
     for q in questions:
-        print(f"[{q['id']:2d}/{len(questions)}] {q['question'][:66]}...")
-        no_rag = ask(q["question"], False, False)
-        plain = ask(q["question"], True, False)
-        improved = ask(q["question"], True, True)
+        turns = q.get("context", "") and "  (multi-turn)" or ""
+        print(f"[{q['id']:2d}/{len(questions)}] {q['question'][:60]}...{turns}")
+        messages = q.get("context", []) + [{"role": "user", "content": q["question"]}]
+        no_rag = ask(messages, False, False)
+        plain = ask(messages, True, False)
+        improved = ask(messages, True, True)
         results.append({
             **q,
             "no_rag": {"reply": no_rag["reply"]},
@@ -93,14 +95,18 @@ def write_report(results: list[dict]) -> None:
         "**Режимы:** `no-RAG` (знания модели) · `plain` (top-k retrieval) · "
         "`improved` (query rewrite + порог-фильтр + rerank, k_before→k_after).",
         "",
+        "🔁 = multi-turn: финальный вопрос содержит отсылку («it/them»), разрешимую "
+        "только из контекста диалога — здесь виден вклад query rewrite.",
+        "",
         "## Сводка",
         "",
         "| # | Вопрос | plain: источник извлечён? | improved: источник извлечён? |",
         "|---|--------|:---:|:---:|",
     ]
     for r in results:
+        marker = "🔁 " if r.get("context") else ""
         lines.append(
-            f"| {r['id']} | {r['question'][:52]}… | "
+            f"| {r['id']} | {marker}{r['question'][:50]}… | "
             f"{'✅' if r['plain_rag']['hit'] else '❌'} | "
             f"{'✅' if r['improved_rag']['hit'] else '❌'} |"
         )
@@ -118,9 +124,11 @@ def write_report(results: list[dict]) -> None:
     ]
     for r in results:
         imp = r["improved_rag"]
+        lines += [f"## {r['id']}. {r['question']}", ""]
+        if r.get("context"):
+            convo = "\n".join(f"{m['role']}: {m['content']}" for m in r["context"])
+            lines += [f"**Контекст диалога (multi-turn):**", "", q(convo), ""]
         lines += [
-            f"## {r['id']}. {r['question']}",
-            "",
             f"**Ожидание:** {r['expectation']}",
             "",
             f"**Ожидаемые источники:** {', '.join(f'`{s}`' for s in r['expected_sources'])}",

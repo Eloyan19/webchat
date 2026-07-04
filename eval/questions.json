@@ -58,5 +58,25 @@
     "question": "What copyright year is stated in the top-level (root) README license header of the Jetpack Compose Samples repository?",
     "expectation": "2024 ('Copyright 2024 The Android Open Source Project') in the root README — note individual samples like Jetchat/Jetsnack state 2020, so the root differs.",
     "expected_sources": ["README.md"]
+  },
+  {
+    "id": 11,
+    "context": [
+      {"role": "user", "content": "Tell me about the Reply sample's navigation."},
+      {"role": "assistant", "content": "Reply uses adaptive Material 3 navigation components (bottom bar, navigation rail, drawer) chosen by window size."}
+    ],
+    "question": "How does it decide which one to show?",
+    "expectation": "ReplyNavigationWrapper uses currentWindowAdaptiveInfo() and currentWindowSize() (as DpSize) and a when-expression to pick navLayoutType based on the window size class / posture. The follow-up 'it' = Reply navigation; only resolvable from context.",
+    "expected_sources": ["Reply/app/src/main/java/com/example/reply/ui/navigation/ReplyNavigationComponents.kt"]
+  },
+  {
+    "id": 12,
+    "context": [
+      {"role": "user", "content": "Tell me about the SnackbarManager in Jetsnack."},
+      {"role": "assistant", "content": "SnackbarManager is an object that manages snackbar messages shown in Jetsnack."}
+    ],
+    "question": "What type does it expose them as?",
+    "expectation": "It exposes the messages as a read-only StateFlow<List<Message>> (backed by a private MutableStateFlow, surfaced via asStateFlow()). 'it' = SnackbarManager, 'them' = messages; only resolvable from context.",
+    "expected_sources": ["Jetsnack/app/src/main/java/com/example/jetsnack/model/SnackbarManager.kt"]
   }
 ]
