@@ -109,10 +109,9 @@ def write_report(results: list[dict]) -> None:
         f"**Retrieval hit rate:** plain {ph}/{len(results)} · improved {ih}/{len(results)} "
         "(на уровне файла).",
         "",
-        "> Примечание: cross-encoder reranker реализуется в сервисе `../rag/` (см. "
-        "`rag-reranker-task.md`). Пока он не подключён, `improved` = query rewrite + "
-        "порог-фильтр над cosine-порядком; полноценный выигрыш реранка появится после "
-        "апдейта rag.",
+        "> `improved` = query rewrite (только для multi-turn) + фильтр по cross-encoder "
+        "`rerank_score` + rerank-порядок из сервиса `../rag/`. Реранкер переупорядочивает "
+        "кандидатов по релевантности, поэтому нужный чанк чаще попадает в топ-K.",
         "",
         "---",
         "",

@@ -18,8 +18,11 @@ RAG_K = int(os.getenv("RAG_K", "5"))
 # Improved RAG: retrieve more (k_before), filter by cosine threshold, keep k_after.
 RAG_K_BEFORE = int(os.getenv("RAG_K_BEFORE", "20"))
 RAG_K_AFTER = int(os.getenv("RAG_K_AFTER", "5"))
-# Cosine-similarity cutoff for the relevance filter (calibrated on this corpus:
-# in-domain chunks score ~0.66-0.73, off-topic ~0.5-0.59).
+# Relevance cutoffs for the improved-mode filter. Preferred signal is the
+# cross-encoder rerank_score returned by the RAG service (wide separation:
+# in-domain ~ >=0, off-topic ~ -11), with a fallback to the compressed cosine
+# score if the service doesn't rerank (in-domain ~0.66-0.73, off-topic ~0.5-0.59).
+RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "-6.0"))
 RAG_SIMILARITY_THRESHOLD = float(os.getenv("RAG_SIMILARITY_THRESHOLD", "0.62"))
 
 app = FastAPI()
@@ -47,6 +50,7 @@ class Source(BaseModel):
     file: str
     section: str
     score: float
+    rerank_score: float | None = None
 
 
 @app.get("/health")
@@ -115,7 +119,10 @@ def build_context(chunks: list[dict]) -> tuple[str, list[Source]]:
         section = c.get("section", "")
         text = c.get("text", "")
         blocks.append(f"[{i}] {file} :: {section}\n{text}")
-        sources.append(Source(file=file, section=section, score=c.get("score", 0.0)))
+        sources.append(Source(
+            file=file, section=section,
+            score=c.get("score", 0.0), rerank_score=c.get("rerank_score"),
+        ))
     context = "\n\n".join(blocks)
     system_prompt = (
         "Ты отвечаешь на вопрос пользователя, опираясь ТОЛЬКО на приведённый ниже "
@@ -144,11 +151,17 @@ async def fetch_rag_context(
     meta = {"k_requested": k, "k_returned": len(chunks), "improved": improved}
 
     if improved:
-        kept = [c for c in chunks if c.get("score", 0.0) >= RAG_SIMILARITY_THRESHOLD]
-        kept = kept[:RAG_K_AFTER]
+        # Filter on the cross-encoder rerank_score when the service provides it
+        # (far cleaner separation); fall back to the cosine score otherwise.
+        has_rerank = bool(chunks) and chunks[0].get("rerank_score") is not None
+        if has_rerank:
+            signal, threshold = "rerank_score", RERANK_THRESHOLD
+        else:
+            signal, threshold = "score", RAG_SIMILARITY_THRESHOLD
+        kept = [c for c in chunks if c.get(signal, 0.0) >= threshold][:RAG_K_AFTER]
         meta.update(
-            {"threshold": RAG_SIMILARITY_THRESHOLD, "k_after_filter": len(kept),
-             "filtered_out": len(chunks) - len(kept)}
+            {"filter_signal": signal, "threshold": threshold,
+             "k_after_filter": len(kept), "filtered_out": len(chunks) - len(kept)}
         )
         chunks = kept
 
@@ -176,7 +189,10 @@ async def chat(req: ChatRequest):
         )
         if last_user:
             search_query = last_user
-            if req.improvedRag:
+            # Query rewrite only helps when there is prior dialog to resolve
+            # (pronouns/references). On a standalone question it can only add
+            # noise words and drift retrieval, so skip it.
+            if req.improvedRag and len(messages) > 1:
                 search_query = await rewrite_query(messages, last_user, api_key)
                 rewritten_query = search_query
             system_prompt, sources, rag_meta = await fetch_rag_context(
