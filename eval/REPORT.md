@@ -4,9 +4,9 @@
 
 ## Сводка
 
-- **Источники в ответе:** 11/12
-- **Цитаты в ответе:** 11/12
-- **Ответ обоснован цитатами (судья):** 11/12
+- **Источники в ответе:** 12/12
+- **Цитаты в ответе:** 12/12
+- **Ответ обоснован цитатами (судья):** 10/12
 - **Off-topic → «не знаю» (abstain):** 5/5
 
 ## In-domain
@@ -17,14 +17,14 @@
 | 2 | What constructor parameters does Jetchat's Con… | ✅ | ✅ | ✅ | ✅ |
 | 3 | Which UI tests are included in the Jetchat and… | ✅ | ✅ | ✅ | ✅ |
 | 4 | In JetNews's HomeViewModel, HomeUiState is a s… | ✅ | ✅ | ✅ | ✅ |
-| 5 | In Jetsnack's JetsnackNavController, what does… | ❌ | ❌ | — | ❌ |
+| 5 | In Jetsnack's JetsnackNavController, what does… | ✅ | ✅ | ❌ | ✅ |
 | 6 | In Jetsnack, what kind of Kotlin declaration i… | ✅ | ✅ | ✅ | ✅ |
 | 7 | What fields does the ErrorMessage data class i… | ✅ | ✅ | ✅ | ✅ |
 | 8 | In Reply's ReplyNavigationWrapper composable, … | ✅ | ✅ | ✅ | ✅ |
 | 9 | What are the three main screens/components of … | ✅ | ✅ | ✅ | ✅ |
 | 10 | What copyright year is stated in the top-level… | ✅ | ✅ | ✅ | ✅ |
 | 11 | 🔁 How does it decide which one to show?… | ✅ | ✅ | ✅ | ✅ |
-| 12 | 🔁 What type does it expose them as?… | ✅ | ✅ | ✅ | ✅ |
+| 12 | 🔁 What type does it expose them as?… | ✅ | ✅ | ❌ | ❌ |
 
 ## Off-topic (проверка режима «не знаю»)
 
@@ -44,11 +44,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата [1] содержит код, где addMessage добавляет сообщение в начало списка по индексу 0, что полностью соответствует утверждению в ответе.
+**Судья:** Цитата [1] показывает, что addMessage добавляет сообщение с индексом 0, то есть в начало списка, что соответствует ответу.
 
 **Ответ:**
 
-> The `addMessage(msg)` function adds a message to the beginning of the list (at index 0) [1].
+> The `addMessage(msg)` function adds the message to the beginning of the list, as indicated by the comment *Add to the beginning of the list* [1].
 
 **Источники и цитаты:**
 
@@ -66,11 +66,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ соответствует данным из цитаты [1], где указаны те же три параметра конструктора.
+**Судья:** Ответ полностью соответствует цитате: перечислены те же три параметра с теми же типами.
 
 **Ответ:**
 
-> В соответствии с [4] конструктор `ConversationUiState` принимает три параметра: `val channelName: String`, `val channelMembers: Int` и `initialMessages: List<Message>`.
+> Класс `ConversationUiState` принимает три параметра конструктора: `channelName` (String), `channelMembers` (Int) и `initialMessages` (List<Message>) [4].
 
 **Источники и цитаты:**
 
@@ -86,34 +86,33 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует цитатам: перечислены те же три теста, их описания совпадают по смыслу.
+**Судья:** Ответ ассистента полностью соответствует цитатам: перечислены три теста, их описания совпадают с источниками.
 
 **Ответ:**
 
-> The Jetchat sample includes UI tests in the [androidTest](app/src/androidTest/java/com/example/compose/jetchat) folder, which are [ConversationTest] [2], [UserInputTest] [3], and [NavigationTest] [4]. 
-> - [ConversationTest] [2] contains UI tests for the Conversation screen, including behavior when dark mode changes. 
-> - [UserInputTest] [3] checks that user input composables (including extended controls) behave as expected regarding keyboard show/hide. 
-> - [NavigationTest] [4] shows how to write tests that assert directly on the Navigation Controller.
+> The Jetchat androidTest suite includes three UI tests: [1] ConversationTest covers UI tests for the Conversation screen, including behavior when dark mode changes. [2] UserInputTest checks that the user input composable and extended controls behave as expected with keyboard show/hide. [3] NavigationTest shows how to write tests that assert directly on the Navigation Controller.
 
 **Источники и цитаты:**
 
 1. `Jetchat/README.md` :: Jetchat sample > Features > UI tests
 
+> Jetchat sample > Features > UI tests
+> ### UI tests
 > In [androidTest](app/src/androidTest/java/com/example/compose/jetchat) you'll find a suite of UI tests that showcase interesting patterns in Compose:
 
 2. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
 
-> [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
+> #### [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
 > UI tests for the Conversation screen. Includes a test that checks the behavior of the app when dark mode changes.
 
 3. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
 
-> [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
+> #### [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
 > Checks that the user input composable, including extended controls, behave as expected showing and hiding the keyboard.
 
 4. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt)
 
-> [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt)
+> #### [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt)
 > Shows how to write tests that assert directly on the [Navigation Controller](https://developer.android.com/reference/androidx/navigation/NavController).
 
 ---
@@ -124,11 +123,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ подтверждается цитатой: перечисленные свойства совпадают с объявленными в исходном коде.
+**Судья:** Ответ полностью соответствует цитате, перечисляющей три свойства с указанными типами.
 
 **Ответ:**
 
-> В HomeUiState declared three common properties: `isLoading`, `errorMessages`, and `searchInput` [1].
+> В HomeUiState объявлены три общих свойства: `isLoading` (тип Boolean), `errorMessages` (тип List<ErrorMessage>) и `searchInput` (тип String) [1].
 
 **Источники и цитаты:**
 
@@ -146,17 +145,23 @@
 
 **Ожидание:** upPress() calls navController.navigateUp(). The class is annotated @Stable.
 
-**Проверки:** источники ❌ · цитаты ❌ · отброшено цитат 0 · обоснован — · retrieval hit ❌
+**Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ❌ · retrieval hit ✅
 
-**Судья:** ассистент воздержался (не знаю)
+**Судья:** В цитатах нет информации о функции upPress() и аннотациях класса JetsnackNavController, поэтому ответ, утверждающий, что upPress() определена в другом классе и что класс не содержит аннотаций, не подтверждается цитатами.
 
 **Ответ:**
 
-> Не знаю: в найденных источниках нет ответа на этот вопрос. Уточните или переформулируйте вопрос.
+> В JetsnackNavController нет функции upPress() — она определена в другом классе. Сам класс JetsnackNavController не содержит аннотаций в предоставленных источниках [2].
 
 **Источники и цитаты:**
 
-_нет_
+1. `Jetsnack/app/src/main/java/com/example/jetsnack/ui/navigation/JetsnackNavController.kt` :: rememberJetsnackNavController
+
+> @Composable
+> fun rememberJetsnackNavController(navController: NavHostController = rememberNavController()): JetsnackNavController =
+>     remember(navController) {
+>         JetsnackNavController(navController)
+>     }
 
 ---
 
@@ -166,11 +171,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата [1] подтверждает, что SnackbarManager является объектом (object), а поле messages — StateFlow, построенным на MutableStateFlow.
+**Судья:** Цитата [1] явно показывает, что SnackbarManager объявлен как object, а его свойство messages — это StateFlow<List<Message>>, получаемый через asStateFlow() из приватного _messages, что полностью соответствует утверждению в ответе.
 
 **Ответ:**
 
-> В Jetsnack `SnackbarManager` — это объявление `object` (синглтон). Он предоставляет сообщения через [3] `StateFlow<List<Message>>` (поле `messages`), которое является `StateFlow`, построенным на `MutableStateFlow`.
+> In Jetsnack, `SnackbarManager` is an `object` (a Kotlin singleton) and it exposes its messages as a `StateFlow` via the `messages` property, which is a `StateFlow<List<Message>>` backed by a private `MutableStateFlow`. [3]
 
 **Источники и цитаты:**
 
@@ -180,6 +185,22 @@ _нет_
 > 
 >     private val _messages: MutableStateFlow<List<Message>> = MutableStateFlow(emptyList())
 >     val messages: StateFlow<List<Message>> get() = _messages.asStateFlow()
+> 
+>     fun showMessage(@StringRes messageTextId: Int) {
+>         _messages.update { currentMessages ->
+>             currentMessages + Message(
+>                 id = UUID.randomUUID().mostSignificantBits,
+>                 messageId = messageTextId,
+>             )
+>         }
+>     }
+> 
+>     fun setMessageShown(messageId: Long) {
+>         _messages.update { currentMessages ->
+>             currentMessages.filterNot { it.id == messageId }
+>         }
+>     }
+> }
 
 ---
 
@@ -189,11 +210,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует цитате: указаны те же два поля с теми же типами и аннотацией.
+**Судья:** Цитата содержит именно эти поля с теми же типами (Long, Int) и аннотацией @StringRes, что указано в ответе.
 
 **Ответ:**
 
-> Класс `ErrorMessage` содержит два поля: `id` (тип `Long`) и `messageId` (тип `Int` с аннотацией `@StringRes`) [1].
+> The `ErrorMessage` data class contains two fields: `id` of type `Long` and `messageId` of type `Int` (annotated with `@StringRes`). [1]
 
 **Источники и цитаты:**
 
@@ -209,11 +230,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует логике цитаты, перечислены те же условия для определения типа навигации, включая isTabletop, isCompact, isWidthAtLeastBreakpoint и проверку ширины окна.
+**Судья:** Ответ полностью соответствует коду из цитаты: условия и возвращаемые типы совпадают.
 
 **Ответ:**
 
-> В `ReplyNavigationWrapper` тип навигации определяется с помощью `adaptiveInfo.windowPosture.isTabletop`, `adaptiveInfo.windowSizeClass.isCompact()`, `adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)` и `windowSize.width >= 1200.dp` [3].
+> Нavigation layout type is decided based on `adaptiveInfo.windowPosture`, `adaptiveInfo.windowSizeClass`, and `windowSize.width`. If the window posture is tabletop or the size class is compact, it uses `NavigationSuiteType.NavigationBar`; if the width is at least 1200.dp, it uses `NavigationSuiteType.NavigationDrawer`; otherwise, `NavigationSuiteType.NavigationRail`[3].
 
 **Источники и цитаты:**
 
@@ -238,11 +259,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует содержанию цитаты, в которой перечислены те же три компонента.
+**Судья:** Ответ полностью соответствует цитате, в которой указаны три компонента: home screen, podcast details screen и player screen.
 
 **Ответ:**
 
-> The three main screens/components of the Jetcaster phone app are: the home screen, the podcast details screen, and the player screen [1].
+> Три основных компонента Jetcaster phone app: экран 'Home', экран 'Podcast details' и экран 'Player' [1].
 
 **Источники и цитаты:**
 
@@ -258,11 +279,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата [1] явно содержит копирайт 2024 года, что совпадает с ответом.
+**Судья:** Цитата [1] явно указывает год 2024, что соответствует утверждению в ответе.
 
 **Ответ:**
 
-> The copyright year stated in the top-level (root) README license header is 2024 [1].
+> The top-level (root) README license header states the copyright year 2024 [1].
 
 **Источники и цитаты:**
 
@@ -283,11 +304,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ соответствует цитате: компактные устройства -> NavigationBar, ширина >= 1200 dp -> NavigationDrawer, иначе NavigationRail, упомянуты AdaptiveInfo и windowSize.
+**Судья:** Ответ полностью соответствует коду из цитаты [1] и упомянутому в [2] жесту открытия drawer из rail.
 
 **Ответ:**
 
-> On compact devices it shows a [bottom navigation bar][4]; on medium devices a [navigation rail][4]; on large devices (width ≥ 1200 dp) a [permanent navigation drawer][4]. The rail is also used with a modal drawer for extra content. Choices come from `AdaptiveInfo` and window size checks[4].
+> The navigation type is chosen based on device size and state using `adaptiveInfo.windowSizeClass`, `adaptiveInfo.windowPosture.isTabletop`, and window width. For example, [2] shows: `NavigationSuiteType.NavigationBar` for compact or tabletop; `NavigationSuiteType.NavigationDrawer` if width ≥ 1200.dp and expanded breakpoint; otherwise `NavigationSuiteType.NavigationRail`. The drawer can also be opened via gesture on rail [2].
 
 **Источники и цитаты:**
 
@@ -315,19 +336,19 @@ _нет_
 
 **Ожидание:** It exposes the messages as a read-only StateFlow<List<Message>> (backed by a private MutableStateFlow, surfaced via asStateFlow()). 'it' = SnackbarManager, 'them' = messages; only resolvable from context.
 
-**Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
+**Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ❌ · retrieval hit ❌
 
-**Судья:** Цитата [1] подтверждает, что сообщения представлены как `StateFlow<List<Message>>`, что соответствует ответу.
+**Судья:** Цитата содержит SnackbarHostState, но ответ утверждает, что SnackbarManager не существует в контексте Jetsnack, однако ни одна из цитат не подтверждает отсутствие упоминаний SnackbarManager; ответ основан на неподтверждённом выводе.
 
 **Ответ:**
 
-> SnackbarManager exposes messages as `StateFlow<List<Message>>` [2].
+> The SnackbarManager does not exist in the provided context. The relevant snippet is from JetNews, not Jetsnack, and shows a `SnackbarHostState` being used. In the context of Jetsnack, there is no `SnackbarManager` mentioned. Therefore, I cannot answer the question based on the given sources.
 
 **Источники и цитаты:**
 
-1. `Jetsnack/app/src/main/java/com/example/jetsnack/model/SnackbarManager.kt` :: SnackbarManager
+1. `JetNews/app/src/main/java/com/example/jetnews/ui/components/JetnewsSnackbarHost.kt` :: JetnewsSnackbarHost
 
-> val messages: StateFlow<List<Message>> get() = _messages.asStateFlow()
+> hostState: SnackbarHostState
 
 ---
 

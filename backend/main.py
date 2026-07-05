@@ -150,8 +150,10 @@ def build_system_prompt(chunks: list[dict]) -> str:
         "- answer: ответ на языке вопроса; ссылайся на источники по номеру в квадратных "
         "скобках, например [1].\n"
         "- used: для КАЖДОГО источника, на который опираешься, укажи id (номер [i]) и quote — "
-        "фрагмент, СКОПИРОВАННЫЙ ДОСЛОВНО из текста этого источника (без изменений, перевода "
-        "и сокращений).\n"
+        "фрагмент, СКОПИРОВАННЫЙ ПОБУКВЕННО из текста источника НА ЯЗЫКЕ ОРИГИНАЛА (обычно "
+        "английский или код). НЕ переводи цитату на русский, не сокращай, не меняй пробелы, "
+        "регистр и пунктуацию — quote должна дословно встречаться в тексте источника, иначе "
+        "она будет отброшена. answer пиши на языке вопроса, но quote — только из оригинала.\n"
         "- Если в контексте НЕТ ответа на вопрос — верни в answer честное «Не знаю: в источниках "
         "нет ответа на этот вопрос, уточните вопрос» и пустой used: [].\n"
         "- Не выдумывай факты и цитаты вне контекста.\n\n"
@@ -214,6 +216,40 @@ def parse_grounded_reply(
             quote=quote,
         ))
     return answer, sources, dropped
+
+
+# Prepended (as an extra system turn) on a retry when the first cited attempt yielded
+# no validated quote — reminds the model to copy the quote verbatim, in the source's
+# original language, instead of paraphrasing or translating it.
+QUOTE_RETRY_NUDGE = (
+    "ВАЖНО: в прошлый раз ни одна цитата не совпала с текстом источника дословно. "
+    "Скопируй каждую quote ПОБУКВЕННО из текста источника на ЯЗЫКЕ ОРИГИНАЛА "
+    "(не переводи, не сокращай, не меняй пробелы и регистр). Если дословной цитаты "
+    "действительно нет — верни used: []."
+)
+
+
+async def generate_grounded(
+    messages: list[dict], chunks: list[dict], api_key: str
+) -> tuple[str, list[Source], int, bool]:
+    """Cited JSON generation with ONE retry on empty quotes.
+
+    The verbatim-quote gate occasionally false-abstains: retrieval found the answer
+    but the model paraphrased/translated its quote, so none validated. Before giving
+    up we retry once with a firmer instruction (a cheap way to cut false «не знаю»
+    without weakening the guarantee — a real quote is still required). Returns
+    (reply, sources, quotes_dropped, retried). messages[0] is the context system
+    prompt; the nudge goes right after it."""
+    raw = await call_deepseek(messages, api_key, response_format={"type": "json_object"})
+    reply, sources, dropped = parse_grounded_reply(raw, chunks)
+    if sources:
+        return reply, sources, dropped, False
+    retry_messages = [
+        messages[0], {"role": "system", "content": QUOTE_RETRY_NUDGE}, *messages[1:]
+    ]
+    raw = await call_deepseek(retry_messages, api_key, response_format={"type": "json_object"})
+    reply, sources, dropped = parse_grounded_reply(raw, chunks)
+    return reply, sources, dropped, True
 
 
 async def fetch_rag_context(query: str, improved: bool) -> tuple[list[dict], dict]:
@@ -290,15 +326,15 @@ async def chat(req: ChatRequest):
 
     try:
         if grounded_chunks:
-            raw = await call_deepseek(
-                messages, api_key, response_format={"type": "json_object"}
+            reply, sources, dropped, retried = await generate_grounded(
+                messages, grounded_chunks, api_key
             )
-            reply, sources, dropped = parse_grounded_reply(raw, grounded_chunks)
             rag_meta["quotesDropped"] = dropped
-            # No validated quote survived (model paraphrased/hallucinated, cited
-            # nothing, or returned empty/non-JSON). We must not surface an answer
-            # with dangling [i] refs and no sources — abstain to keep the "every
-            # answer is grounded in a real quote" guarantee.
+            rag_meta["retried"] = retried
+            # No validated quote survived even after the retry (model paraphrased/
+            # hallucinated, cited nothing, or returned empty/non-JSON). We must not
+            # surface an answer with dangling [i] refs and no sources — abstain to
+            # keep the "every answer is grounded in a real quote" guarantee.
             if not sources:
                 rag_meta["abstained"] = True
                 rag_meta["modelAbstained"] = True
