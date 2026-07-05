@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""RAG mode comparison harness for the webchat control question set.
+"""Grounding & citation eval for the webchat RAG control question set.
 
-For each question in questions.json it calls the backend /chat in three modes:
-  - no_rag:       useRag=false                  (model's own knowledge)
-  - plain_rag:    useRag=true, improvedRag=false (single-stage top-k retrieval)
-  - improved_rag: useRag=true, improvedRag=true  (query rewrite + threshold filter
-                  + rerank, k_before -> k_after)
-It records each answer, the sources RAG used, the rewritten query, and whether the
-expected source file was retrieved (retrieval hit) for plain vs improved. Writes
-results.json and a side-by-side REPORT.md.
+For each in-domain question it calls the backend /chat in cited mode
+(useRag=true, improvedRag=true) and checks the anti-hallucination contract:
+  - sources present in the answer,
+  - a verbatim quote present for every source (the backend already validates
+    each quote is a real substring of its chunk; here we confirm non-emptiness),
+  - the answer is grounded in those quotes — scored by a DeepSeek LLM judge,
+  - (retrieval hit) the expected source file was actually retrieved.
+
+For each off-topic question it checks that the assistant abstains ("не знаю")
+instead of answering from the model's own knowledge (ragMeta.abstained == true).
+
+Writes results.json and REPORT.md.
 
 Runs against the backend directly (127.0.0.1:8000) on purpose: that bypasses the
-nginx token gate and rate limit, so the burst of requests doesn't trip HTTP 429.
-Override with BACKEND_URL / CHAT_TOKEN env vars to point at the public URL.
+nginx token gate and rate limit. Override with BACKEND_URL / CHAT_TOKEN env vars.
 """
 import json
 import os
+import re
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -43,111 +48,195 @@ def hit(expected: list[str], sources: list[dict]) -> bool:
     return any(exp in files for exp in expected)
 
 
+def judge(question: str, answer: str, quotes: list[str]) -> tuple[bool | None, str]:
+    """LLM judge (DeepSeek via backend, no RAG): does the answer follow from the
+    quotes? Returns (grounded|None, reason); None if it can't be scored."""
+    if not quotes:
+        return None, "нет цитат для проверки"
+    quoted = "\n".join(f"[{i}] {q}" for i, q in enumerate(quotes, 1))
+    prompt = (
+        "Ты — строгий проверяющий фактической опоры ответа на цитаты. Дан вопрос, "
+        "ответ ассистента и цитаты из источников, на которые он опирался. Реши, "
+        "следует ли фактическое содержание ответа из этих цитат (подтверждается ими, "
+        "не выдумано и не противоречит им). Язык ответа и цитат может отличаться — "
+        "оценивай смысл, а не язык.\n"
+        'Ответь СТРОГО одним JSON-объектом: {"grounded": true|false, "reason": "<кратко по-русски>"}.\n\n'
+        f"Вопрос: {question}\n\nОтвет ассистента: {answer}\n\nЦитаты:\n{quoted}"
+    )
+    try:
+        reply = ask([{"role": "user", "content": prompt}], False, False)["reply"]
+        m = re.search(r"\{.*\}", reply, re.S)
+        data = json.loads(m.group(0)) if m else {}
+        return bool(data.get("grounded")), str(data.get("reason", "")).strip()
+    except (urllib.error.URLError, json.JSONDecodeError, KeyError, ValueError) as e:
+        return None, f"ошибка судьи: {e}"
+
+
+def run_indomain(q: dict) -> dict:
+    messages = q.get("context", []) + [{"role": "user", "content": q["question"]}]
+    r = ask(messages, True, True)  # cited mode: sources + quotes + threshold gate
+    sources = r.get("sources", [])
+    meta = r.get("ragMeta", {})
+    quotes = [s["quote"] for s in sources if s.get("quote")]
+    abstained = bool(meta.get("abstained"))
+    checks = {
+        "sources_present": len(sources) > 0,
+        "quotes_present": len(sources) > 0 and len(quotes) == len(sources),
+        "quotes_dropped": meta.get("quotesDropped", 0),
+        "abstained": abstained,
+        "retrieval_hit": hit(q["expected_sources"], sources),
+    }
+    if abstained:
+        grounded, reason = None, "ассистент воздержался (не знаю)"
+    else:
+        grounded, reason = judge(q["question"], r["reply"], quotes)
+    return {
+        **q, "type": "indomain",
+        "reply": r["reply"],
+        "rewritten_query": r.get("rewrittenQuery"),
+        "sources": [{"file": s["file"], "section": s["section"],
+                     "quote": s.get("quote")} for s in sources],
+        "checks": checks, "grounded": grounded, "grounded_reason": reason,
+    }
+
+
+def run_offtopic(q: dict) -> dict:
+    r = ask([{"role": "user", "content": q["question"]}], True, True)
+    meta = r.get("ragMeta", {})
+    abstained = bool(meta.get("abstained"))
+    return {
+        **q, "type": "offtopic",
+        "reply": r["reply"], "abstained": abstained,
+        "pass": abstained, "sources": r.get("sources", []),
+    }
+
+
 def main() -> None:
     questions = json.loads((HERE / "questions.json").read_text())
+    indomain = [q for q in questions if not q.get("offtopic")]
+    offtopic = [q for q in questions if q.get("offtopic")]
     results = []
-    for q in questions:
-        turns = q.get("context", "") and "  (multi-turn)" or ""
-        print(f"[{q['id']:2d}/{len(questions)}] {q['question'][:60]}...{turns}")
-        messages = q.get("context", []) + [{"role": "user", "content": q["question"]}]
-        no_rag = ask(messages, False, False)
-        plain = ask(messages, True, False)
-        improved = ask(messages, True, True)
-        results.append({
-            **q,
-            "no_rag": {"reply": no_rag["reply"]},
-            "plain_rag": {
-                "reply": plain["reply"],
-                "sources": [s["file"] for s in plain.get("sources", [])],
-                "hit": hit(q["expected_sources"], plain.get("sources", [])),
-            },
-            "improved_rag": {
-                "reply": improved["reply"],
-                "sources": [s["file"] for s in improved.get("sources", [])],
-                "hit": hit(q["expected_sources"], improved.get("sources", [])),
-                "rewritten_query": improved.get("rewrittenQuery"),
-                "rag_meta": improved.get("ragMeta", {}),
-            },
-        })
+
+    for q in indomain:
+        turns = "  (multi-turn)" if q.get("context") else ""
+        print(f"[in {q['id']:2d}] {q['question'][:56]}...{turns}")
+        results.append(run_indomain(q))
+        time.sleep(0.3)
+
+    for q in offtopic:
+        print(f"[off {q['id']:2d}] {q['question'][:56]}...")
+        results.append(run_offtopic(q))
         time.sleep(0.3)
 
     (HERE / "results.json").write_text(json.dumps(results, ensure_ascii=False, indent=2))
     write_report(results)
-    ph = sum(r["plain_rag"]["hit"] for r in results)
-    ih = sum(r["improved_rag"]["hit"] for r in results)
-    print(f"\nDone. Retrieval hits — plain: {ph}/{len(results)}, improved: {ih}/{len(results)}."
-          f" See eval/REPORT.md")
+
+    ind = [r for r in results if r["type"] == "indomain"]
+    off = [r for r in results if r["type"] == "offtopic"]
+    n = len(ind)
+    sp = sum(r["checks"]["sources_present"] for r in ind)
+    qp = sum(r["checks"]["quotes_present"] for r in ind)
+    gr = sum(r["grounded"] is True for r in ind)
+    ab = sum(r["pass"] for r in off)
+    print(f"\nDone. In-domain: источники {sp}/{n} · цитаты {qp}/{n} · grounded {gr}/{n}. "
+          f"Off-topic abstain: {ab}/{len(off)}. See eval/REPORT.md")
 
 
-def q(text: str) -> str:
+def q_block(text: str) -> str:
     return "> " + text.replace("\n", "\n> ")
 
 
+def _mark(ok: bool) -> str:
+    return "✅" if ok else "❌"
+
+
 def write_report(results: list[dict]) -> None:
-    ph = sum(r["plain_rag"]["hit"] for r in results)
-    ih = sum(r["improved_rag"]["hit"] for r in results)
+    ind = [r for r in results if r["type"] == "indomain"]
+    off = [r for r in results if r["type"] == "offtopic"]
+    n = len(ind)
+    sp = sum(r["checks"]["sources_present"] for r in ind)
+    qp = sum(r["checks"]["quotes_present"] for r in ind)
+    gr = sum(r["grounded"] is True for r in ind)
+    ab = sum(r["pass"] for r in off)
+
     lines = [
-        "# Сравнение режимов RAG: no-RAG / plain / improved",
+        "# Цитаты, источники и режим «не знаю» — отчёт eval",
         "",
-        "Генерируется `compare.py`. Корпус — Google *compose-samples*. Генерацию делает "
-        "DeepSeek; RAG добавляет извлечённые чанки как system-контекст.",
-        "",
-        "**Режимы:** `no-RAG` (знания модели) · `plain` (top-k retrieval) · "
-        "`improved` (query rewrite + порог-фильтр + rerank, k_before→k_after).",
-        "",
-        "🔁 = multi-turn: финальный вопрос содержит отсылку («it/them»), разрешимую "
-        "только из контекста диалога — здесь виден вклад query rewrite.",
+        "Генерируется `compare.py`. Корпус — Google *compose-samples*. Прогон в "
+        "**cited-режиме** (`useRag=true, improvedRag=true`): извлечение → порог-фильтр → "
+        "генерация со структурированными цитатами. Цитаты валидируются backend как "
+        "дословные подстроки чанков; здесь судья DeepSeek проверяет, следует ли смысл "
+        "ответа из этих цитат.",
         "",
         "## Сводка",
         "",
-        "| # | Вопрос | plain: источник извлечён? | improved: источник извлечён? |",
-        "|---|--------|:---:|:---:|",
+        f"- **Источники в ответе:** {sp}/{n}",
+        f"- **Цитаты в ответе:** {qp}/{n}",
+        f"- **Ответ обоснован цитатами (судья):** {gr}/{n}",
+        f"- **Off-topic → «не знаю» (abstain):** {ab}/{len(off)}",
+        "",
+        "## In-domain",
+        "",
+        "| # | Вопрос | Источники | Цитаты | Обоснован | Retrieval hit |",
+        "|---|--------|:---:|:---:|:---:|:---:|",
     ]
-    for r in results:
+    for r in ind:
+        c = r["checks"]
         marker = "🔁 " if r.get("context") else ""
+        grounded = "—" if r["grounded"] is None else _mark(r["grounded"])
         lines.append(
-            f"| {r['id']} | {marker}{r['question'][:50]}… | "
-            f"{'✅' if r['plain_rag']['hit'] else '❌'} | "
-            f"{'✅' if r['improved_rag']['hit'] else '❌'} |"
+            f"| {r['id']} | {marker}{r['question'][:46]}… | {_mark(c['sources_present'])} | "
+            f"{_mark(c['quotes_present'])} | {grounded} | {_mark(c['retrieval_hit'])} |"
         )
     lines += [
         "",
-        f"**Retrieval hit rate:** plain {ph}/{len(results)} · improved {ih}/{len(results)} "
-        "(на уровне файла).",
+        "## Off-topic (проверка режима «не знаю»)",
         "",
-        "> `improved` = query rewrite (только для multi-turn) + фильтр по cross-encoder "
-        "`rerank_score` + rerank-порядок из сервиса `../rag/`. Реранкер переупорядочивает "
-        "кандидатов по релевантности, поэтому нужный чанк чаще попадает в топ-K.",
-        "",
-        "---",
-        "",
+        "| # | Вопрос | Abstain «не знаю»? |",
+        "|---|--------|:---:|",
     ]
-    for r in results:
-        imp = r["improved_rag"]
+    for r in off:
+        lines.append(f"| {r['id']} | {r['question'][:52]}… | {_mark(r['pass'])} |")
+    lines += ["", "---", ""]
+
+    for r in ind:
+        c = r["checks"]
         lines += [f"## {r['id']}. {r['question']}", ""]
         if r.get("context"):
             convo = "\n".join(f"{m['role']}: {m['content']}" for m in r["context"])
-            lines += [f"**Контекст диалога (multi-turn):**", "", q(convo), ""]
+            lines += ["**Контекст диалога (multi-turn):**", "", q_block(convo), ""]
+        grounded = "—" if r["grounded"] is None else _mark(r["grounded"])
         lines += [
             f"**Ожидание:** {r['expectation']}",
             "",
-            f"**Ожидаемые источники:** {', '.join(f'`{s}`' for s in r['expected_sources'])}",
+            f"**Проверки:** источники {_mark(c['sources_present'])} · "
+            f"цитаты {_mark(c['quotes_present'])} · отброшено цитат {c['quotes_dropped']} · "
+            f"обоснован {grounded} · retrieval hit {_mark(c['retrieval_hit'])}",
             "",
-            f"**Переписанный запрос (improved):** `{imp['rewritten_query']}`",
+            f"**Судья:** {r['grounded_reason']}",
             "",
-            f"**Retrieval hit:** plain {'✅' if r['plain_rag']['hit'] else '❌'} · "
-            f"improved {'✅' if imp['hit'] else '❌'} · "
-            f"фильтр improved: {imp['rag_meta'].get('k_returned', '?')} → "
-            f"{imp['rag_meta'].get('k_after_filter', '?')} "
-            f"(порог {imp['rag_meta'].get('threshold', '?')})",
-            "",
-            "**no-RAG:**", "", q(r["no_rag"]["reply"]), "",
-            "**plain RAG:**", "", q(r["plain_rag"]["reply"]), "",
-            f"_источники:_ {', '.join(f'`{s}`' for s in r['plain_rag']['sources']) or '—'}", "",
-            "**improved RAG:**", "", q(imp["reply"]), "",
-            f"_источники:_ {', '.join(f'`{s}`' for s in imp['sources']) or '—'}", "",
-            "---", "",
+            "**Ответ:**", "", q_block(r["reply"]), "",
+            "**Источники и цитаты:**", "",
         ]
+        if r["sources"]:
+            for i, s in enumerate(r["sources"], 1):
+                lines.append(f"{i}. `{s['file']}` :: {s['section']}")
+                if s.get("quote"):
+                    lines += ["", q_block(s["quote"]), ""]
+        else:
+            lines += ["_нет_", ""]
+        lines += ["---", ""]
+
+    lines += ["## Off-topic — ответы", ""]
+    for r in off:
+        lines += [
+            f"### {r['id']}. {r['question']}",
+            "",
+            f"**Abstain:** {_mark(r['pass'])}",
+            "",
+            q_block(r["reply"]), "",
+        ]
+
     (HERE / "REPORT.md").write_text("\n".join(lines))
 
 

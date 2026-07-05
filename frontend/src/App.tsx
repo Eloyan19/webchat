@@ -141,6 +141,7 @@ function App() {
                   {m.sources.map((s, j) => (
                     <li key={j}>
                       <code>{s.file}</code> :: {s.section}
+                      {s.quote && <blockquote className="quote">{s.quote}</blockquote>}
                     </li>
                   ))}
                 </ol>

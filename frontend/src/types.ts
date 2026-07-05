@@ -4,6 +4,8 @@ export interface Source {
   file: string
   section: string
   score: number
+  // Verbatim fragment of the chunk the answer relied on (validated server-side).
+  quote?: string
 }
 
 export interface Message {

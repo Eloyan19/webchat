@@ -78,5 +78,40 @@
     "question": "What type does it expose them as?",
     "expectation": "It exposes the messages as a read-only StateFlow<List<Message>> (backed by a private MutableStateFlow, surfaced via asStateFlow()). 'it' = SnackbarManager, 'them' = messages; only resolvable from context.",
     "expected_sources": ["Jetsnack/app/src/main/java/com/example/jetsnack/model/SnackbarManager.kt"]
+  },
+  {
+    "id": 13,
+    "offtopic": true,
+    "question": "What is the boiling point of water at sea level?",
+    "expectation": "Off-topic: not in the compose-samples corpus. The assistant must abstain («не знаю») and ask to refine — no answer from the model's own knowledge.",
+    "expected_sources": []
+  },
+  {
+    "id": 14,
+    "offtopic": true,
+    "question": "Who won the FIFA World Cup in 1998?",
+    "expectation": "Off-topic: not in the corpus. Assistant must abstain.",
+    "expected_sources": []
+  },
+  {
+    "id": 15,
+    "offtopic": true,
+    "question": "Give me a recipe for classic Italian tiramisu.",
+    "expectation": "Off-topic: not in the corpus. Assistant must abstain.",
+    "expected_sources": []
+  },
+  {
+    "id": 16,
+    "offtopic": true,
+    "question": "What is the capital of Australia?",
+    "expectation": "Off-topic: not in the corpus. Assistant must abstain.",
+    "expected_sources": []
+  },
+  {
+    "id": 17,
+    "offtopic": true,
+    "question": "How does photosynthesis convert sunlight into energy in plants?",
+    "expectation": "Off-topic: not in the corpus. Assistant must abstain.",
+    "expected_sources": []
   }
 ]
