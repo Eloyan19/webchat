@@ -44,11 +44,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата подтверждает, что addMessage(msg) добавляет сообщение в начало списка.
+**Судья:** Цитата [1] содержит код, где addMessage добавляет сообщение в начало списка по индексу 0, что полностью соответствует утверждению в ответе.
 
 **Ответ:**
 
-> В `ConversationUiState` метод `addMessage(msg)` вставляет новое сообщение в начало списка [1].
+> The `addMessage(msg)` function adds a message to the beginning of the list (at index 0) [1].
 
 **Источники и цитаты:**
 
@@ -66,11 +66,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует цитате: перечислены те же параметры с теми же типами.
+**Судья:** Ответ соответствует данным из цитаты [1], где указаны те же три параметра конструктора.
 
 **Ответ:**
 
-> Класс `ConversationUiState` принимает параметры: `channelName: String`, `channelMembers: Int` и `initialMessages: List<Message>` [4].
+> В соответствии с [4] конструктор `ConversationUiState` принимает три параметра: `val channelName: String`, `val channelMembers: Int` и `initialMessages: List<Message>`.
 
 **Источники и цитаты:**
 
@@ -84,23 +84,37 @@
 
 **Ожидание:** UserInputTest; ConversationTest (UI tests for the Conversation screen, incl. a test for behavior when dark mode changes); NavigationTest (asserts directly on the Navigation Controller / NavController).
 
-**Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 1 · обоснован ✅ · retrieval hit ✅
+**Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Все три теста (ConversationTest для dark mode, UserInputTest для клавиатуры, NavigationTest для навигации) упомянуты в ответе и подтверждены цитатами [1] и [2].
+**Судья:** Ответ полностью соответствует цитатам: перечислены те же три теста, их описания совпадают по смыслу.
 
 **Ответ:**
 
-> The UI tests included in the Jetchat androidTest suite are: [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt), [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt), and [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt). ConversationTest includes a test that checks the behavior of the app when dark mode changes [2]. UserInputTest checks that the user input composable, including extended controls, behave as expected showing and hiding the keyboard [3]. NavigationTest shows how to write tests that assert directly on the Navigation Controller [4].
+> The Jetchat sample includes UI tests in the [androidTest](app/src/androidTest/java/com/example/compose/jetchat) folder, which are [ConversationTest] [2], [UserInputTest] [3], and [NavigationTest] [4]. 
+> - [ConversationTest] [2] contains UI tests for the Conversation screen, including behavior when dark mode changes. 
+> - [UserInputTest] [3] checks that user input composables (including extended controls) behave as expected regarding keyboard show/hide. 
+> - [NavigationTest] [4] shows how to write tests that assert directly on the Navigation Controller.
 
 **Источники и цитаты:**
 
-1. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
+1. `Jetchat/README.md` :: Jetchat sample > Features > UI tests
 
+> In [androidTest](app/src/androidTest/java/com/example/compose/jetchat) you'll find a suite of UI tests that showcase interesting patterns in Compose:
+
+2. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
+
+> [ConversationTest](app/src/androidTest/java/com/example/compose/jetchat/ConversationTest.kt)
 > UI tests for the Conversation screen. Includes a test that checks the behavior of the app when dark mode changes.
 
-2. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
+3. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
 
+> [UserInputTest](app/src/androidTest/java/com/example/compose/jetchat/UserInputTest.kt)
 > Checks that the user input composable, including extended controls, behave as expected showing and hiding the keyboard.
+
+4. `Jetchat/README.md` :: Jetchat sample > Features > UI tests > [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt)
+
+> [NavigationTest](app/src/androidTest/java/com/example/compose/jetchat/NavigationTest.kt)
+> Shows how to write tests that assert directly on the [Navigation Controller](https://developer.android.com/reference/androidx/navigation/NavController).
 
 ---
 
@@ -110,11 +124,11 @@
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** В цитате перечислены именно три свойства: isLoading, errorMessages, searchInput, что полностью соответствует ответу.
+**Судья:** Ответ подтверждается цитатой: перечисленные свойства совпадают с объявленными в исходном коде.
 
 **Ответ:**
 
-> В HomeUiState объявлены три общих свойства: `isLoading: Boolean`, `errorMessages: List<ErrorMessage>` и `searchInput: String` [1].
+> В HomeUiState declared three common properties: `isLoading`, `errorMessages`, and `searchInput` [1].
 
 **Источники и цитаты:**
 
@@ -125,27 +139,6 @@
 >     val isLoading: Boolean
 >     val errorMessages: List<ErrorMessage>
 >     val searchInput: String
-> 
->     /**
->      * There are no posts to render.
->      *
->      * This could either be because they are still loading or they failed to load, and we are
->      * waiting to reload them.
->      */
->     data class NoPosts(override val isLoading: Boolean, override val errorMessages: List<ErrorMessage>, override val searchInput: String) :
->         HomeUiState
-> 
->     /**
->      * There are posts to render, as contained in [postsFeed].
->      */
->     data class HasPosts(
->         val postsFeed: PostsFeed,
->         val favorites: Set<String>,
->         override val isLoading: Boolean,
->         override val errorMessages: List<ErrorMessage>,
->         override val searchInput: String,
->     ) : HomeUiState
-> }
 
 ---
 
@@ -155,11 +148,11 @@
 
 **Проверки:** источники ❌ · цитаты ❌ · отброшено цитат 0 · обоснован — · retrieval hit ❌
 
-**Судья:** нет цитат для проверки
+**Судья:** ассистент воздержался (не знаю)
 
 **Ответ:**
 
-> Не знаю: в источниках нет ответа на этот вопрос, уточните вопрос
+> Не знаю: в найденных источниках нет ответа на этот вопрос. Уточните или переформулируйте вопрос.
 
 **Источники и цитаты:**
 
@@ -173,11 +166,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата [1] подтверждает, что SnackbarManager объявлен как object, а поле 'messages' является StateFlow<List<Message>>.
+**Судья:** Цитата [1] подтверждает, что SnackbarManager является объектом (object), а поле messages — StateFlow, построенным на MutableStateFlow.
 
 **Ответ:**
 
-> SnackbarManager — это `object` (синглтон) [3]. Сообщения для Snackbar предоставляются через `StateFlow<List<Message>>`, доступный как `messages` [3].
+> В Jetsnack `SnackbarManager` — это объявление `object` (синглтон). Он предоставляет сообщения через [3] `StateFlow<List<Message>>` (поле `messages`), которое является `StateFlow`, построенным на `MutableStateFlow`.
 
 **Источники и цитаты:**
 
@@ -187,22 +180,6 @@ _нет_
 > 
 >     private val _messages: MutableStateFlow<List<Message>> = MutableStateFlow(emptyList())
 >     val messages: StateFlow<List<Message>> get() = _messages.asStateFlow()
-> 
->     fun showMessage(@StringRes messageTextId: Int) {
->         _messages.update { currentMessages ->
->             currentMessages + Message(
->                 id = UUID.randomUUID().mostSignificantBits,
->                 messageId = messageTextId,
->             )
->         }
->     }
-> 
->     fun setMessageShown(messageId: Long) {
->         _messages.update { currentMessages ->
->             currentMessages.filterNot { it.id == messageId }
->         }
->     }
-> }
 
 ---
 
@@ -212,11 +189,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ ассистента полностью соответствует цитате: поля id (тип Long) и messageId (тип Int) указаны в data class ErrorMessage.
+**Судья:** Ответ полностью соответствует цитате: указаны те же два поля с теми же типами и аннотацией.
 
 **Ответ:**
 
-> ErrorMessage data class содержит поля: `id: Long` и `messageId: Int` [1].
+> Класс `ErrorMessage` содержит два поля: `id` (тип `Long`) и `messageId` (тип `Int` с аннотацией `@StringRes`) [1].
 
 **Источники и цитаты:**
 
@@ -232,11 +209,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует логике определения типа навигации из цитаты: используется `adaptiveInfo` (полученный от `currentWindowAdaptiveInfo`) и `windowSize.width` (от `currentWindowSize`), условия приоритета и значения совпадают.
+**Судья:** Ответ полностью соответствует логике цитаты, перечислены те же условия для определения типа навигации, включая isTabletop, isCompact, isWidthAtLeastBreakpoint и проверку ширины окна.
 
 **Ответ:**
 
-> В `ReplyNavigationWrapper` тип навигации определяется с помощью двух API: `currentWindowAdaptiveInfo()` [3] и `currentWindowSize()` [3]. `currentWindowAdaptiveInfo()` предоставляет `windowPosture` и `windowSizeClass`; если `windowPosture.isTabletop` или `windowSizeClass.isCompact()` — выбирается `NavigationBar` [3]; если ширина окна >= 1200.dp и `windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_EXPANDED_LOWER_BOUND)` — выбирается `NavigationDrawer` [3]; иначе — `NavigationRail` [3]. `currentWindowSize()` используется для проверки ширины окна в dp [3].
+> В `ReplyNavigationWrapper` тип навигации определяется с помощью `adaptiveInfo.windowPosture.isTabletop`, `adaptiveInfo.windowSizeClass.isCompact()`, `adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)` и `windowSize.width >= 1200.dp` [3].
 
 **Источники и цитаты:**
 
@@ -261,11 +238,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ дословно повторяет информацию из цитаты, где перечислены три компонента: home screen, podcast details screen, player screen.
+**Судья:** Ответ полностью соответствует содержанию цитаты, в которой перечислены те же три компонента.
 
 **Ответ:**
 
-> The Jetcaster phone app has three main components: the home screen, the podcast details screen, and the player screen [1].
+> The three main screens/components of the Jetcaster phone app are: the home screen, the podcast details screen, and the player screen [1].
 
 **Источники и цитаты:**
 
@@ -281,11 +258,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата [1] прямо подтверждает, что указан год 2024, что соответствует ответу.
+**Судья:** Цитата [1] явно содержит копирайт 2024 года, что совпадает с ответом.
 
 **Ответ:**
 
-> The top-level README license header states copyright 2024 [1].
+> The copyright year stated in the top-level (root) README license header is 2024 [1].
 
 **Источники и цитаты:**
 
@@ -306,11 +283,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Ответ полностью соответствует логике условия в коде из цитаты: сначала проверка isTabletop и компактного размера (NavigationBar), затем ширина >= 1200.dp (NavigationDrawer), остальное — NavigationRail.
+**Судья:** Ответ соответствует цитате: компактные устройства -> NavigationBar, ширина >= 1200 dp -> NavigationDrawer, иначе NavigationRail, упомянуты AdaptiveInfo и windowSize.
 
 **Ответ:**
 
-> It decides based on `ReplyNavigationWrapper` in [1]. First, if `windowPosture.isTabletop` is true or the window size class is compact, it uses `NavigationBar`. Otherwise, if the width is at least 1200.dp (expanded), it uses `NavigationDrawer`. In all other cases (e.g., medium width), it uses `NavigationRail`. This logic is implemented in `navLayoutType` via `when` expressions in [1].
+> On compact devices it shows a [bottom navigation bar][4]; on medium devices a [navigation rail][4]; on large devices (width ≥ 1200 dp) a [permanent navigation drawer][4]. The rail is also used with a modal drawer for extra content. Choices come from `AdaptiveInfo` and window size checks[4].
 
 **Источники и цитаты:**
 
@@ -340,11 +317,11 @@ _нет_
 
 **Проверки:** источники ✅ · цитаты ✅ · отброшено цитат 0 · обоснован ✅ · retrieval hit ✅
 
-**Судья:** Цитата утверждает, что поле messages имеет тип StateFlow<List<Message>>, что совпадает с ответом.
+**Судья:** Цитата [1] подтверждает, что сообщения представлены как `StateFlow<List<Message>>`, что соответствует ответу.
 
 **Ответ:**
 
-> It exposes messages as a `StateFlow<List<Message>>`. [1]
+> SnackbarManager exposes messages as `StateFlow<List<Message>>` [2].
 
 **Источники и цитаты:**
 
