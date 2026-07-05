@@ -6,3 +6,6 @@ __pycache__/
 *.pyc
 .venv/
 backend/.venv/
+
+# реальный прод-конфиг фронта с gate-токеном — не в git
+frontend/.env.production
