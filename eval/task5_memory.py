@@ -46,7 +46,7 @@ SCENARIOS = [
             "What fields does the ErrorMessage data class contain?",
             "How does HomeViewModel expose the UI state to the composables?",
             "How are error messages surfaced to the user in JetNews?",
-            "Which library does JetNews use for its networking layer?",
+            "What are the two subtypes of the HomeUiState sealed interface?",
             "Recap the JetNews home-state design we've discussed.",
         ],
     },
@@ -63,7 +63,8 @@ def run_scenario(scenario: dict) -> dict:
         messages.append({"role": "user", "content": user_text})
         resp = httpx.post(
             BACKEND,
-            json={"messages": messages, "useRag": True, "sessionId": session_id},
+            json={"messages": messages, "useRag": True, "improvedRag": True,
+                  "sessionId": session_id},
             timeout=120,
         )
         resp.raise_for_status()
@@ -73,6 +74,7 @@ def run_scenario(scenario: dict) -> dict:
         task_state = data.get("taskState") or {}
         rag_meta = data.get("ragMeta") or {}
         abstained = bool(rag_meta.get("abstained"))
+        recap = bool(rag_meta.get("recap"))
 
         messages.append({"role": "assistant", "content": reply})
         goal = (task_state.get("goal") or "").strip()
@@ -84,6 +86,7 @@ def run_scenario(scenario: dict) -> dict:
             "goal": goal,
             "n_sources": len(sources),
             "abstained": abstained,
+            "recap": recap,
             "reply_head": reply[:90],
         })
 
@@ -107,9 +110,14 @@ def check(result: dict) -> list[str]:
                     f"goal потерян на реплике: {t['user'][:60]!r}"
                 )
 
-    # (2) у каждого НЕ-abstain ответа есть источники.
+    # (2) содержательность: обычный (не-recap) не-abstain ответ обязан иметь источники;
+    #     recap-ответ отвечает из «памяти задачи» без кода-источника — его инвариант в том,
+    #     что он НЕ уходит в abstain.
     for t in turns:
-        if not t["abstained"] and t["n_sources"] == 0:
+        if t.get("recap"):
+            if t["abstained"]:
+                failures.append(f"recap-ответ ушёл в abstain: {t['user'][:60]!r}")
+        elif not t["abstained"] and t["n_sources"] == 0:
             failures.append(
                 f"RAG-ответ без источников (не abstain): {t['user'][:60]!r}"
             )
@@ -126,7 +134,7 @@ def main() -> int:
         res["failures"] = fails
         results.append(res)
         for t in res["turns"]:
-            flag = "ABSTAIN" if t["abstained"] else f"{t['n_sources']} src"
+            flag = "RECAP" if t.get("recap") else ("ABSTAIN" if t["abstained"] else f"{t['n_sources']} src")
             print(f"   • [{flag:>8}] goal={t['goal'][:50]!r}")
         if fails:
             all_failures.extend(f"[{scenario['name']}] {f}" for f in fails)
@@ -150,7 +158,9 @@ def write_report(results: list[dict], all_failures: list[str]) -> None:
         "(`127.0.0.1:8000`, минуя nginx). Проверяемые инварианты:",
         "",
         "1. `task_state.goal` не теряется по ходу диалога (единожды установлен — держится).",
-        "2. У каждого не-abstain RAG-ответа есть источники (grounding не регрессировал).",
+        "2. Обычный RAG-ответ несёт источники; recap-вопрос отвечается из «памяти задачи» "
+        "(без кода-источника) и не уходит в abstain. Сценарии идут в improved-режиме "
+        "(rewrite + rerank).",
         "",
         f"**Итог:** {'✅ оба инварианта держатся' if not all_failures else f'❌ {len(all_failures)} нарушений'}.",
         "",
@@ -165,9 +175,10 @@ def write_report(results: list[dict], all_failures: list[str]) -> None:
         lines.append("|---|---|---|---|---|")
         for i, t in enumerate(res["turns"], 1):
             goal = (t["goal"][:45] + "…") if len(t["goal"]) > 45 else t["goal"]
+            status = "recap" if t.get("recap") else ("да" if t["abstained"] else "нет")
             lines.append(
                 f"| {i} | {t['user'][:55]} | {goal or '—'} | "
-                f"{t['n_sources']} | {'да' if t['abstained'] else 'нет'} |"
+                f"{t['n_sources']} | {status} |"
             )
         lines.append("")
         if res["failures"]:

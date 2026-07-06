@@ -53,7 +53,9 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   // Мини-чат: RAG всегда включён по умолчанию (источники всегда).
   const [useRag, setUseRag] = useState(true)
-  const [improvedRag, setImprovedRag] = useState(false)
+  // Улучшенный режим (rewrite + rerank + фильтр) по умолчанию ВКЛ: без rewrite
+  // multi-turn теряет местоимения («тот класс»/«его») и уходит в ложное «не знаю».
+  const [improvedRag, setImprovedRag] = useState(true)
   // «Память задачи» — последнее состояние, присланное backend по этой сессии.
   const [taskState, setTaskState] = useState<TaskState | null>(null)
 

@@ -21,7 +21,7 @@ RAG_URL = os.getenv("RAG_URL", "http://127.0.0.1:8100")
 # rerank + threshold-filter, keep k_after.
 RAG_K = int(os.getenv("RAG_K", "5"))
 RAG_K_BEFORE = int(os.getenv("RAG_K_BEFORE", "20"))
-RAG_K_AFTER = int(os.getenv("RAG_K_AFTER", "5"))
+RAG_K_AFTER = int(os.getenv("RAG_K_AFTER", "8"))
 # Relevance floor for the "don't know" gate. Preferred signal is the cross-encoder
 # rerank_score returned by the RAG service (wide separation: in-domain ~ >=0,
 # off-topic ~ -11); fallback to the compressed cosine score when the service does
@@ -403,6 +403,22 @@ async def fetch_rag_context(query: str, improved: bool) -> tuple[list[dict], dic
     return kept, meta
 
 
+# Маркеры мета/recap-вопросов «о самом диалоге» (а не о коде). Такой вопрос не имеет
+# источника в базе — отвечаем из истории + «памяти задачи», минуя RAG-гейт, вместо
+# ложного «не знаю». Эвристика: дёшево и прозрачно; промах просто идёт обычным путём.
+_RECAP_MARKERS = (
+    "recap", "summarize", "summary", "sum up", "so far", "what have i learned",
+    "what did we", "what have we", "review what", "overview of our",
+    "подведи", "итог", "резюме", "суммируй", "что мы обсу", "что я узнал",
+)
+
+
+def is_recap_question(text: str) -> bool:
+    """Мета-вопрос о ходе диалога (подведи итог / что обсудили)?"""
+    t = text.lower()
+    return any(m in t for m in _RECAP_MARKERS)
+
+
 @app.post("/chat")
 async def chat(req: ChatRequest):
     api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -427,6 +443,27 @@ async def chat(req: ChatRequest):
         last_user = next(
             (m["content"] for m in reversed(messages) if m["role"] == "user"), None
         )
+        # Мета/recap-вопрос о самом диалоге: отвечаем из истории + «памяти задачи»,
+        # без RAG и без грундинг-гейта (кода-источника для такого ответа нет).
+        if last_user and is_recap_question(last_user):
+            recap_sys = (
+                _task_state_block(task_state)
+                + "Пользователь просит подвести итог/резюме уже состоявшегося диалога. "
+                "Ответь кратко, опираясь на историю переписки выше и «Память задачи». "
+                "Источники из базы кода для такого ответа не требуются."
+            )
+            try:
+                reply = await call_deepseek(
+                    [{"role": "system", "content": recap_sys}, *messages], api_key
+                )
+            except httpx.HTTPError as e:
+                return JSONResponse(
+                    status_code=502, content={"error": f"DeepSeek request failed: {e}"}
+                )
+            return {
+                "reply": reply, "sources": [], "rewrittenQuery": None,
+                "ragMeta": {"recap": True}, "taskState": task_state.model_dump(),
+            }
         if last_user:
             search_query = last_user
             # Query rewrite only helps when there is prior dialog to resolve
