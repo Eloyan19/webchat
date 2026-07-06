@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { MAX_CONTEXT, sendChat, summarize } from './api'
-import type { Message } from './types'
+import { MAX_CONTEXT, resetSessionId, sendChat, summarize } from './api'
+import type { Message, TaskState } from './types'
 import './App.css'
 
 const STORAGE_KEY = 'webchat.messages'
@@ -18,6 +18,28 @@ function loadMessages(): Message[] {
   }
 }
 
+// Есть ли что показывать в панели памяти (иначе не рендерим пустой блок).
+function hasTaskState(s: TaskState): boolean {
+  return Boolean(
+    s.goal || s.constraints.length || s.terms.length || s.clarified.length,
+  )
+}
+
+// Подсписок панели «Состояние задачи»; пустой массив не рендерится.
+function TaskList({ label, items }: { label: string; items: string[] }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div className="task-group">
+      <span className="task-label">{label}:</span>
+      <ul>
+        {items.map((it, i) => (
+          <li key={i}>{it}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function App() {
   const [messages, setMessages] = useState<Message[]>(loadMessages)
   const [summary, setSummary] = useState<string>(
@@ -29,8 +51,11 @@ function App() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [useRag, setUseRag] = useState(false)
+  // Мини-чат: RAG всегда включён по умолчанию (источники всегда).
+  const [useRag, setUseRag] = useState(true)
   const [improvedRag, setImprovedRag] = useState(false)
+  // «Память задачи» — последнее состояние, присланное backend по этой сессии.
+  const [taskState, setTaskState] = useState<TaskState | null>(null)
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
@@ -71,7 +96,7 @@ function App() {
         }
       }
 
-      const { reply, sources, rewrittenQuery } = await sendChat(
+      const { reply, sources, rewrittenQuery, taskState: nextState } = await sendChat(
         next,
         useRag,
         useRag && improvedRag,
@@ -81,6 +106,7 @@ function App() {
         ...prev,
         { role: 'assistant', content: reply, ts: Date.now(), sources, rewrittenQuery },
       ])
+      if (nextState) setTaskState(nextState)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -94,7 +120,10 @@ function App() {
     setMessages([])
     setSummary('')
     setSummarizedCount(0)
+    setTaskState(null)
     setError(null)
+    // Новая сессия -> backend стартует «память задачи» с чистого листа.
+    resetSessionId()
     localStorage.removeItem(STORAGE_KEY)
     localStorage.removeItem(SUMMARY_KEY)
     localStorage.removeItem(SUMMARIZED_COUNT_KEY)
@@ -141,6 +170,9 @@ function App() {
                   {m.sources.map((s, j) => (
                     <li key={j}>
                       <code>{s.file}</code> :: {s.section}
+                      {s.chunk_id != null && (
+                        <span className="chunk-id"> #{s.chunk_id}</span>
+                      )}
                       {s.quote && <blockquote className="quote">{s.quote}</blockquote>}
                     </li>
                   ))}
@@ -153,6 +185,20 @@ function App() {
       </div>
 
       {error && <div className="error">{error}</div>}
+
+      {taskState && hasTaskState(taskState) && (
+        <section className="task-state" aria-label="Состояние задачи">
+          <h2 className="task-state-title">🧠 Состояние задачи</h2>
+          {taskState.goal && (
+            <p className="task-goal">
+              <span className="task-label">Цель:</span> {taskState.goal}
+            </p>
+          )}
+          <TaskList label="Ограничения" items={taskState.constraints} />
+          <TaskList label="Термины" items={taskState.terms} />
+          <TaskList label="Уточнено" items={taskState.clarified} />
+        </section>
+      )}
 
       <label className="rag-toggle">
         <input

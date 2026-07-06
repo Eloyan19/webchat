@@ -1,13 +1,34 @@
-import type { Message, Source } from './types'
+import type { Message, Source, TaskState } from './types'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
 const CHAT_TOKEN = import.meta.env.VITE_CHAT_TOKEN ?? ''
 export const MAX_CONTEXT = 20
 
+const SESSION_KEY = 'webchat.sessionId'
+
+// Стабильный id сессии — ключ «памяти задачи» на backend. Генерируем один раз и
+// держим в localStorage, чтобы состояние диалога переживало перезагрузку вкладки.
+export function getSessionId(): string {
+  let id = localStorage.getItem(SESSION_KEY)
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem(SESSION_KEY, id)
+  }
+  return id
+}
+
+// Начать новую сессию (при очистке истории) — сбрасывает память задачи на backend.
+export function resetSessionId(): string {
+  const id = crypto.randomUUID()
+  localStorage.setItem(SESSION_KEY, id)
+  return id
+}
+
 export interface ChatResult {
   reply: string
   sources: Source[]
   rewrittenQuery: string | null
+  taskState: TaskState | null
 }
 
 type WireMessage = { role: string; content: string }
@@ -22,11 +43,12 @@ async function postChat(
   messages: WireMessage[],
   useRag: boolean,
   improvedRag: boolean,
+  sessionId?: string,
 ): Promise<ChatResult> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ messages, useRag, improvedRag }),
+    body: JSON.stringify({ messages, useRag, improvedRag, sessionId }),
   })
   if (!res.ok) {
     const text = await res.text()
@@ -37,6 +59,7 @@ async function postChat(
     reply: data.reply as string,
     sources: (data.sources ?? []) as Source[],
     rewrittenQuery: (data.rewrittenQuery ?? null) as string | null,
+    taskState: (data.taskState ?? null) as TaskState | null,
   }
 }
 
@@ -57,7 +80,7 @@ export async function sendChat(
   console.log(
     `[chat] sending ${wire.length} messages (history ${messages.length}, summary=${summary ? 'yes' : 'no'}, useRag=${useRag}, improvedRag=${improvedRag})`,
   )
-  return postChat(wire, useRag, improvedRag)
+  return postChat(wire, useRag, improvedRag, getSessionId())
 }
 
 // Condense the messages that fell out of the takeLast(MAX_CONTEXT) window into a

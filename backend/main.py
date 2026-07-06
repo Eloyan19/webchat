@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from memory import TaskMemory, TaskState
+
 load_dotenv()
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
@@ -36,6 +38,14 @@ ABSTAIN_REPLY = (
     "Уточните или переформулируйте вопрос."
 )
 
+# Per-session «память задачи» (in-memory, эфемерная). См. memory.py.
+MEMORY = TaskMemory()
+# Сколько последних сообщений подавать в LLM-апдейт task_state: дельта диалога.
+# Сам накопленный state уже несёт историю, всю переписку дублировать не нужно.
+TASK_STATE_RECENT = 6
+# Кап на длину массивов state — держим промпт генерации компактным и гасим дрейф.
+TASK_STATE_CAP = 8
+
 app = FastAPI()
 
 app.add_middleware(
@@ -55,6 +65,9 @@ class ChatRequest(BaseModel):
     messages: list[Message]
     useRag: bool = False
     improvedRag: bool = False
+    # Идентификатор сессии от фронта — ключ «памяти задачи». Без него state
+    # не хранится (каждый ход стартует с пустого): память чисто опциональна.
+    sessionId: str | None = None
 
 
 class Source(BaseModel):
@@ -62,6 +75,8 @@ class Source(BaseModel):
     section: str
     score: float
     rerank_score: float | None = None
+    # Стабильный id чанка из rag /search — сквозная адресация источника в UI.
+    chunk_id: int | None = None
     # Verbatim fragment of this chunk that the model used, validated as a real
     # substring of the chunk text (anti-hallucination). None only on fallback paths.
     quote: str | None = None
@@ -134,15 +149,44 @@ async def rag_search(query: str, k: int, rerank: bool) -> list[dict]:
         return []
 
 
-def build_system_prompt(chunks: list[dict]) -> str:
+def _task_state_block(task_state: TaskState | None) -> str:
+    """Компактный блок «Память задачи» для system-prompt генерации.
+
+    Помечен как НАМЕРЕНИЕ (не источник фактов/цитат): помогает модели понять цель
+    диалога, но цитаты по-прежнему берутся только из пронумерованного контекста.
+    Пустой state -> пустая строка (ничего не подмешиваем)."""
+    if task_state is None:
+        return ""
+    parts: list[str] = []
+    if task_state.goal:
+        parts.append(f"- Цель: {task_state.goal}")
+    if task_state.constraints:
+        parts.append(f"- Ограничения: {'; '.join(task_state.constraints)}")
+    if task_state.terms:
+        parts.append(f"- Термины: {'; '.join(task_state.terms)}")
+    if task_state.clarified:
+        parts.append(f"- Уточнено: {'; '.join(task_state.clarified)}")
+    if not parts:
+        return ""
+    body = "\n".join(parts)
+    return (
+        "Память задачи (для понимания намерения пользователя, это НЕ источник фактов "
+        "и НЕ источник цитат — отвечай и цитируй только из контекста ниже):\n"
+        f"{body}\n\n"
+    )
+
+
+def build_system_prompt(chunks: list[dict], task_state: TaskState | None = None) -> str:
     """System prompt that pins the model to the context and forces a cited JSON
-    reply. Chunks are numbered [1..n]; the model must echo those ids in `used`."""
+    reply. Chunks are numbered [1..n]; the model must echo those ids in `used`.
+    An optional task_state block is prepended as intent context (not a quote source)."""
     blocks = [
         f"[{i}] {c.get('file', '')} :: {c.get('section', '')}\n{c.get('text', '')}"
         for i, c in enumerate(chunks, start=1)
     ]
     context = "\n\n".join(blocks)
     return (
+        f"{_task_state_block(task_state)}"
         "Ты отвечаешь на вопрос пользователя, опираясь ТОЛЬКО на приведённый ниже "
         "контекст из базы знаний. Верни СТРОГО один JSON-объект такого вида:\n"
         '{"answer": "...", "used": [{"id": <номер источника>, "quote": "<дословный фрагмент>"}]}\n'
@@ -213,7 +257,7 @@ def parse_grounded_reply(
         sources.append(Source(
             file=chunk.get("file", ""), section=chunk.get("section", ""),
             score=chunk.get("score", 0.0), rerank_score=chunk.get("rerank_score"),
-            quote=quote,
+            chunk_id=chunk.get("chunk_id"), quote=quote,
         ))
     return answer, sources, dropped
 
@@ -250,6 +294,78 @@ async def generate_grounded(
     raw = await call_deepseek(retry_messages, api_key, response_format={"type": "json_object"})
     reply, sources, dropped = parse_grounded_reply(raw, chunks)
     return reply, sources, dropped, True
+
+
+TASK_STATE_SYSTEM = (
+    "Ты ведёшь «память задачи» диалога — структурированное состояние. Верни СТРОГО "
+    "один JSON-объект такого вида:\n"
+    '{"goal": "<строка>", "constraints": ["..."], "terms": ["..."], "clarified": ["..."]}\n'
+    "Смысл полей: goal — главная цель/вопрос пользователя в диалоге; constraints — "
+    "зафиксированные ограничения и требования; terms — важные термины/сущности; "
+    "clarified — что пользователь уже уточнил или решил.\n"
+    "Правила обновления (ОБНОВЛЯЙ ИНКРЕМЕНТАЛЬНО поверх текущего состояния):\n"
+    "- Сохраняй текущий goal, если пользователь его ЯВНО не сменил; не переформулируй "
+    "уже записанное.\n"
+    "- Массивы: объединяй с текущими, добавляй только НОВОЕ, убирай дубли по смыслу.\n"
+    "- Ничего не выдумывай — бери только то, что реально есть в сообщениях.\n"
+    f"- В каждом массиве держи не более {TASK_STATE_CAP} самых релевантных пунктов, "
+    "вытесняя устаревшие; формулировки — короткие.\n"
+    "- Если данных нет — верни пустые: goal \"\", массивы []. Верни ТОЛЬКО JSON."
+)
+
+
+def _dedup_cap(items: list) -> list[str]:
+    """Нормализовать список строк: привести к str, выкинуть пустые, снять дубли
+    (без учёта регистра), обрезать до TASK_STATE_CAP. Защита от разрастания и от
+    мусора, который может вернуть модель."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for it in items if isinstance(items, list) else []:
+        s = str(it).strip()
+        key = s.lower()
+        if not s or key in seen:
+            continue
+        seen.add(key)
+        out.append(s)
+        if len(out) >= TASK_STATE_CAP:
+            break
+    return out
+
+
+async def update_task_state(
+    state: TaskState, recent_msgs: list[dict], api_key: str
+) -> TaskState:
+    """Отдельный DeepSeek-вызов: обновить task_state из (текущий state + свежие
+    сообщения). При любой ошибке (сеть/JSON) возвращаем ПРЕЖНИЙ state — обновление
+    памяти не должно рушить ответ пользователю."""
+    convo = "\n".join(f"{m['role']}: {m['content']}" for m in recent_msgs)
+    messages = [
+        {"role": "system", "content": TASK_STATE_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"Текущее состояние задачи (JSON):\n{state.model_dump_json()}\n\n"
+                f"Свежие сообщения диалога:\n{convo}\n\n"
+                "Верни обновлённое состояние задачи одним JSON-объектом."
+            ),
+        },
+    ]
+    try:
+        raw = await call_deepseek(
+            messages, api_key, response_format={"type": "json_object"}
+        )
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return state
+        goal = str(data.get("goal", "") or "").strip() or state.goal
+        return TaskState(
+            goal=goal,
+            constraints=_dedup_cap(data.get("constraints", [])),
+            terms=_dedup_cap(data.get("terms", [])),
+            clarified=_dedup_cap(data.get("clarified", [])),
+        )
+    except (httpx.HTTPError, KeyError, ValueError, TypeError, AttributeError):
+        return state
 
 
 async def fetch_rag_context(query: str, improved: bool) -> tuple[list[dict], dict]:
@@ -297,6 +413,14 @@ async def chat(req: ChatRequest):
     rag_meta: dict = {}
     grounded_chunks: list[dict] | None = None
 
+    # «Память задачи»: читаем текущее состояние сессии (пустое, если sessionId нет
+    # или сессия новая). Инъектируем в промпт генерации; обновляем в конце хода.
+    if req.sessionId:
+        async with MEMORY.lock:
+            task_state = MEMORY.get(req.sessionId)
+    else:
+        task_state = TaskState()
+
     if req.useRag:
         last_user = next(
             (m["content"] for m in reversed(messages) if m["role"] == "user"), None
@@ -312,15 +436,17 @@ async def chat(req: ChatRequest):
                 search_query, req.improvedRag
             )
             # Relevance gate: nothing passed the floor -> abstain, do not generate.
+            # Ничего не зафиксировали -> task_state не обновляем, возвращаем как есть.
             if rag_meta.get("abstained"):
                 return {
                     "reply": ABSTAIN_REPLY,
                     "sources": [],
                     "rewrittenQuery": rewritten_query,
                     "ragMeta": rag_meta,
+                    "taskState": task_state.model_dump(),
                 }
             messages = [
-                {"role": "system", "content": build_system_prompt(grounded_chunks)},
+                {"role": "system", "content": build_system_prompt(grounded_chunks, task_state)},
                 *messages,
             ]
 
@@ -343,6 +469,7 @@ async def chat(req: ChatRequest):
                     "sources": [],
                     "rewrittenQuery": rewritten_query,
                     "ragMeta": rag_meta,
+                    "taskState": task_state.model_dump(),
                 }
         else:
             reply = await call_deepseek(messages, api_key)
@@ -351,9 +478,23 @@ async def chat(req: ChatRequest):
     except (KeyError, ValueError) as e:
         return JSONResponse(status_code=502, content={"error": f"Bad DeepSeek response: {e}"})
 
+    # Обновляем «память задачи» ПОСЛЕ успешного ответа, отдельным LLM-вызовом. Только
+    # для grounded-ответа с реальными источниками и при наличии sessionId. LLM-вызов
+    # вне Lock (не блокируем другие сессии на время сети); Lock — лишь на быстрый R/W.
+    if req.sessionId and grounded_chunks and sources:
+        recent = [
+            {"role": m.role, "content": m.content} for m in req.messages
+        ][-TASK_STATE_RECENT:]
+        recent.append({"role": "assistant", "content": reply})
+        updated = await update_task_state(task_state, recent, api_key)
+        async with MEMORY.lock:
+            MEMORY.set(req.sessionId, updated)
+        task_state = updated
+
     return {
         "reply": reply,
         "sources": [s.model_dump() for s in sources],
         "rewrittenQuery": rewritten_query,
         "ragMeta": rag_meta,
+        "taskState": task_state.model_dump(),
     }
